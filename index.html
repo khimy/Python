@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saudi Arabia Weather & Environmental Data Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h1>🇸🇦 Saudi Arabia</h1>
+            <h2>Weather & Environmental Data</h2>
+        </div>
+
+        <div class="section">
+            <h3>Base Maps</h3>
+            <div class="layer-group">
+                <label><input type="radio" name="basemap" value="osm" checked> OpenStreetMap</label>
+                <label><input type="radio" name="basemap" value="satellite"> Satellite Imagery</label>
+                <label><input type="radio" name="basemap" value="terrain"> Terrain</label>
+                <label><input type="radio" name="basemap" value="dark"> Dark Mode</label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Satellite & Elevation Data</h3>
+            <div class="layer-group">
+                <label>
+                    <input type="checkbox" id="layer-dem" data-layer="dem">
+                    DEM 10m Resolution
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-soil" data-layer="soil">
+                    Soil Moisture
+                </label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Weather Data Layers</h3>
+            <div class="layer-group">
+                <label>
+                    <input type="checkbox" id="layer-precip" data-layer="precipitation">
+                    Precipitation
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-temp" data-layer="temperature">
+                    Mean Temperature
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-humidity" data-layer="humidity">
+                    Humidity
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-evap" data-layer="evaporation">
+                    Evaporation
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-pet" data-layer="pet">
+                    Potential Evapotranspiration
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-solar" data-layer="solar">
+                    Solar Radiation
+                </label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Weather Stations</h3>
+            <div class="layer-group">
+                <label>
+                    <input type="checkbox" id="layer-stations" data-layer="stations" checked>
+                    Show Weather Stations
+                </label>
+            </div>
+            <button id="btn-refresh" class="btn">🔄 Refresh Live Data</button>
+        </div>
+
+        <div class="section">
+            <h3>Legend</h3>
+            <div id="legend-container">
+                <p class="legend-hint">Enable a layer to see its legend</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Station Info</h3>
+            <div id="station-info">
+                <p class="info-hint">Click a station marker for details</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p>Loading weather data...</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="stations.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
