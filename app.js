@@ -493,6 +493,10 @@
     // --- Scale control ---
     L.control.scale({ imperial: false }).addTo(map);
 
+    // --- Ensure map renders correctly ---
+    setTimeout(() => map.invalidateSize(), 100);
+    window.addEventListener('resize', () => map.invalidateSize());
+
     // --- Initialize ---
     loadStations();
 
