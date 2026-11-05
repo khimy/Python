@@ -143,6 +143,24 @@
             html += row('Soil Temp (0-6 cm)', fmt(weather.soil_temp_0_6, '°C'));
             html += row('Soil Moisture (0-1 cm)', fmt(weather.soil_moisture_0_1, ' m³/m³'));
             html += row('Soil Moisture (1-3 cm)', fmt(weather.soil_moisture_1_3, ' m³/m³'));
+
+            html += `<div class="popup-section">Environmental / Air Quality</div>`;
+            const cat = pm25Category(weather.pm25);
+            if (cat) {
+                html += row('Air Quality (PM2.5)', `<span class="aq-badge" style="background:${cat.color};color:${['#00e400', '#ffff00', '#ff7e00'].includes(cat.color) ? '#111' : '#fff'};">${cat.label}</span>`);
+            }
+            html += row('Dust', fmt(weather.dust, ' µg/m³'));
+            html += row('PM10', fmt(weather.pm10, ' µg/m³'));
+            html += row('PM2.5', fmt(weather.pm25, ' µg/m³'));
+            html += row('Aerosol Optical Depth', fmt(weather.aod, ''));
+            html += row('UV Index', fmt(weather.uv, ''));
+            html += row('Ozone (O₃)', fmt(weather.ozone, ' µg/m³'));
+            html += row('NO₂', fmt(weather.no2, ' µg/m³'));
+            html += row('SO₂', fmt(weather.so2, ' µg/m³'));
+            html += row('CO', fmt(weather.co, ' µg/m³'));
+            html += row('Visibility', weather.visibility != null ? (weather.visibility / 1000).toFixed(1) + ' km' : 'N/A');
+            html += row('Vapour Pressure Deficit', fmt(weather.vpd, ' kPa'));
+            html += row('Wind Gusts', fmt(weather.wind_gusts, ' km/h'));
         } else {
             html += `<div class="popup-section" style="color:#ff6b6b;">Loading weather data...</div>`;
         }
@@ -184,6 +202,10 @@
                 ['Solar Radiation', fmt(weather.shortwave_radiation, ' MJ/m²')],
                 ['ET₀', fmt(weather.et0, ' mm')],
                 ['Soil Moisture', fmt(weather.soil_moisture_0_1, ' m³/m³')],
+                ['Dust', fmt(weather.dust, ' µg/m³')],
+                ['PM2.5', fmt(weather.pm25, ' µg/m³')],
+                ['UV Index', fmt(weather.uv, '')],
+                ['AOD', fmt(weather.aod, '')],
             );
         }
 
@@ -202,7 +224,7 @@
             current: [
                 'temperature_2m', 'relative_humidity_2m', 'apparent_temperature',
                 'precipitation', 'cloud_cover', 'surface_pressure',
-                'wind_speed_10m', 'wind_direction_10m'
+                'wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'
             ].join(','),
             daily: [
                 'temperature_2m_max', 'temperature_2m_min',
@@ -214,7 +236,9 @@
             hourly: [
                 'soil_temperature_6cm',
                 'soil_moisture_0_to_1cm',
-                'soil_moisture_1_to_3cm'
+                'soil_moisture_1_to_3cm',
+                'visibility',
+                'vapour_pressure_deficit'
             ].join(','),
             timezone: 'Asia/Riyadh',
             forecast_days: 1
@@ -231,8 +255,8 @@
             const daily = data.daily || {};
             const hourly = data.hourly || {};
 
-            // Get the most recent hourly soil data
-            const lastHourIdx = hourly.time ? hourly.time.length - 1 : 0;
+            // Use the hourly value for the current hour
+            const lastHourIdx = currentHourIndex(hourly.time, current.time);
 
             return {
                 temperature: current.temperature_2m ?? null,
@@ -253,11 +277,67 @@
                 soil_temp_0_6: hourly.soil_temperature_6cm?.[lastHourIdx] ?? null,
                 soil_moisture_0_1: hourly.soil_moisture_0_to_1cm?.[lastHourIdx] ?? null,
                 soil_moisture_1_3: hourly.soil_moisture_1_to_3cm?.[lastHourIdx] ?? null,
+                wind_gusts: current.wind_gusts_10m ?? null,
+                visibility: hourly.visibility?.[lastHourIdx] ?? null,
+                vpd: hourly.vapour_pressure_deficit?.[lastHourIdx] ?? null,
             };
         } catch (err) {
             console.error(`Failed to fetch weather for ${station.name}:`, err);
             return null;
         }
+    }
+
+    function currentHourIndex(times, currentTime) {
+        if (!times || !times.length) return 0;
+        if (currentTime) {
+            const idx = times.indexOf(currentTime.slice(0, 13) + ':00');
+            if (idx >= 0) return idx;
+        }
+        return times.length - 1;
+    }
+
+    // --- Fetch environmental / air quality data from Open-Meteo ---
+    async function fetchAirQuality(station) {
+        const params = new URLSearchParams({
+            latitude: station.lat,
+            longitude: station.lon,
+            current: [
+                'dust', 'pm10', 'pm2_5', 'aerosol_optical_depth', 'uv_index',
+                'ozone', 'nitrogen_dioxide', 'sulphur_dioxide', 'carbon_monoxide'
+            ].join(','),
+            timezone: 'Asia/Riyadh'
+        });
+
+        try {
+            const response = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const c = (await response.json()).current || {};
+            return {
+                dust: c.dust ?? null,
+                pm10: c.pm10 ?? null,
+                pm25: c.pm2_5 ?? null,
+                aod: c.aerosol_optical_depth ?? null,
+                uv: c.uv_index ?? null,
+                ozone: c.ozone ?? null,
+                no2: c.nitrogen_dioxide ?? null,
+                so2: c.sulphur_dioxide ?? null,
+                co: c.carbon_monoxide ?? null,
+            };
+        } catch (err) {
+            console.error(`Failed to fetch air quality for ${station.name}:`, err);
+            return null;
+        }
+    }
+
+    // PM2.5 category (US EPA 24h breakpoints)
+    function pm25Category(v) {
+        if (v === null || v === undefined) return null;
+        if (v <= 9) return { label: 'Good', color: '#00e400' };
+        if (v <= 35.4) return { label: 'Moderate', color: '#ffff00' };
+        if (v <= 55.4) return { label: 'Unhealthy (Sensitive)', color: '#ff7e00' };
+        if (v <= 125.4) return { label: 'Unhealthy', color: '#ff0000' };
+        if (v <= 225.4) return { label: 'Very Unhealthy', color: '#8f3f97' };
+        return { label: 'Hazardous', color: '#7e0023' };
     }
 
     // --- Load all stations onto the map ---
@@ -272,13 +352,14 @@
         for (let i = 0; i < SAUDI_WEATHER_STATIONS.length; i += batchSize) {
             const batch = SAUDI_WEATHER_STATIONS.slice(i, i + batchSize);
             const results = await Promise.all(batch.map(async (station) => {
-                const weather = await fetchWeatherData(station);
+                const [wx, aq] = await Promise.all([fetchWeatherData(station), fetchAirQuality(station)]);
+                const weather = (wx || aq) ? { ...(wx || {}), ...(aq || {}) } : null;
                 weatherDataCache[station.id] = weather;
                 return { station, weather };
             }));
 
             results.forEach(({ station, weather }) => {
-                const temp = weather ? weather.temperature : null;
+                const temp = weather?.temperature ?? null;
                 const marker = L.marker([station.lat, station.lon], {
                     icon: createStationIcon(temp),
                     title: station.name
@@ -286,7 +367,8 @@
 
                 marker.bindPopup(buildPopupContent(station, weather), {
                     maxWidth: 350,
-                    minWidth: 280
+                    minWidth: 280,
+                    maxHeight: 420
                 });
 
                 marker.on('click', () => updateStationInfo(station, weather));
@@ -317,6 +399,18 @@
             pet: { key: 'et0', unit: 'mm', colors: ['#fff5f0', '#fb6a4a', '#67000d'] },
             solar: { key: 'shortwave_radiation', unit: 'MJ/m²', colors: ['#ffffd4', '#fe9929', '#8c2d04'] },
             soil: { key: 'soil_moisture_0_1', unit: 'm³/m³', colors: ['#fff7ec', '#ec7014', '#7f2704'] },
+            dust: { key: 'dust', unit: 'µg/m³', colors: ['#fff7bc', '#d95f0e', '#662506'] },
+            pm10: { key: 'pm10', unit: 'µg/m³', colors: ['#ffffcc', '#fd8d3c', '#800026'] },
+            pm25: { key: 'pm25', unit: 'µg/m³', colors: ['#00e400', '#ff7e00', '#7e0023'] },
+            aod: { key: 'aod', unit: '', colors: ['#f7f4f9', '#df65b0', '#67001f'] },
+            uv: { key: 'uv', unit: '', colors: ['#4eb400', '#f88700', '#b54cff'] },
+            ozone: { key: 'ozone', unit: 'µg/m³', colors: ['#f7fcfd', '#8c96c6', '#4d004b'] },
+            no2: { key: 'no2', unit: 'µg/m³', colors: ['#fcfbfd', '#9e9ac8', '#3f007d'] },
+            so2: { key: 'so2', unit: 'µg/m³', colors: ['#ffffe5', '#78c679', '#004529'] },
+            co: { key: 'co', unit: 'µg/m³', colors: ['#f7f7f7', '#969696', '#252525'] },
+            visibility: { key: 'visibility', unit: 'm', colors: ['#67000d', '#fcbba1', '#f7fbff'] },
+            vpd: { key: 'vpd', unit: 'kPa', colors: ['#f7fcf0', '#7bccc4', '#084081'] },
+            gusts: { key: 'wind_gusts', unit: 'km/h', colors: ['#f7fbff', '#6baed6', '#08306b'] },
         };
 
         Object.entries(params).forEach(([layerName, config]) => {
@@ -362,6 +456,18 @@
             et0: [0, 10],
             shortwave_radiation: [0, 35],
             soil_moisture_0_1: [0, 0.5],
+            dust: [0, 2000],
+            pm10: [0, 1000],
+            pm25: [0, 250],
+            aod: [0, 2],
+            uv: [0, 12],
+            ozone: [0, 200],
+            no2: [0, 100],
+            so2: [0, 100],
+            co: [0, 1000],
+            visibility: [0, 24000],
+            vpd: [0, 8],
+            wind_gusts: [0, 100],
         };
 
         const [min, max] = ranges[key] || [0, 100];
@@ -456,6 +562,18 @@
             gradient: 'linear-gradient(to right, #fff7ec, #ec7014, #7f2704)',
             labels: ['0', '0.25', '0.5 m³/m³']
         },
+        dust: { title: 'Dust Concentration', gradient: 'linear-gradient(to right, #fff7bc, #d95f0e, #662506)', labels: ['0', '1000', '2000+ µg/m³'] },
+        pm10: { title: 'PM10', gradient: 'linear-gradient(to right, #ffffcc, #fd8d3c, #800026)', labels: ['0', '500', '1000+ µg/m³'] },
+        pm25: { title: 'PM2.5', gradient: 'linear-gradient(to right, #00e400, #ff7e00, #7e0023)', labels: ['0', '125', '250+ µg/m³'] },
+        aod: { title: 'Aerosol Optical Depth', gradient: 'linear-gradient(to right, #f7f4f9, #df65b0, #67001f)', labels: ['0', '1', '2+'] },
+        uv: { title: 'UV Index', gradient: 'linear-gradient(to right, #4eb400, #f88700, #b54cff)', labels: ['0', '6', '12+'] },
+        ozone: { title: 'Ozone (O₃)', gradient: 'linear-gradient(to right, #f7fcfd, #8c96c6, #4d004b)', labels: ['0', '100', '200+ µg/m³'] },
+        no2: { title: 'Nitrogen Dioxide (NO₂)', gradient: 'linear-gradient(to right, #fcfbfd, #9e9ac8, #3f007d)', labels: ['0', '50', '100+ µg/m³'] },
+        so2: { title: 'Sulphur Dioxide (SO₂)', gradient: 'linear-gradient(to right, #ffffe5, #78c679, #004529)', labels: ['0', '50', '100+ µg/m³'] },
+        co: { title: 'Carbon Monoxide (CO)', gradient: 'linear-gradient(to right, #f7f7f7, #969696, #252525)', labels: ['0', '500', '1000+ µg/m³'] },
+        visibility: { title: 'Visibility', gradient: 'linear-gradient(to right, #67000d, #fcbba1, #f7fbff)', labels: ['0 km', '12 km', '24+ km'] },
+        vpd: { title: 'Vapour Pressure Deficit', gradient: 'linear-gradient(to right, #f7fcf0, #7bccc4, #084081)', labels: ['0', '4', '8+ kPa'] },
+        gusts: { title: 'Wind Gusts', gradient: 'linear-gradient(to right, #f7fbff, #6baed6, #08306b)', labels: ['0', '50', '100+ km/h'] },
     };
 
     function updateLegend(layerName) {
