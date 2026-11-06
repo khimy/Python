@@ -1,0 +1,18 @@
+HTTP/1.1 200 Connection Established
+
+HTTP/2 404 
+content-type: text/html; charset=iso-8859-1
+content-length: 58
+date: Fri, 06 Nov 2026 00:37:22 GMT
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+server: ServerTokens ProductOnly
+cache-control: public, max-age=3600
+x-request-id: Zj98d7BsDaLooxkF9IblNYBBS9ENE6Lej4HYf_J-8vLw_8hpqA4kiw==
+x-content-type-options: nosniff
+x-xss-protection: 1; mode=block
+x-frame-options: SAMEORIGIN
+x-cache: Error from cloudfront
+via: 1.1 63640f84d1cdd3131051fed0ef6757e8.cloudfront.net (CloudFront)
+x-amz-cf-pop: ORD56-P7
+x-amz-cf-id: Zj98d7BsDaLooxkF9IblNYBBS9ENE6Lej4HYf_J-8vLw_8hpqA4kiw==
+

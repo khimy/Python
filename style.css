@@ -455,6 +455,51 @@ details.method p { margin-top: 6px; }
 .chart-wrap { position: relative; height: 260px; margin: 8px 0; }
 
 .leaflet-container.drawing { cursor: crosshair; }
+
+/* ---------- Data sources ---------- */
+.src-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 4px 10px;
+    margin-top: 4px;
+    color: #e0e0e0;
+    font-size: 12px;
+}
+.src-check { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.src-check input { accent-color: #34e89e; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.ext-group-title {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+#ext-layers label { font-size: 0.85em; padding: 3px 8px; }
+.key-row { display: flex; gap: 6px; }
+.key-row input {
+    flex: 1;
+    background: #0f0f22;
+    color: #e0e0e0;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    padding: 6px 8px;
+    min-width: 0;
+}
+.key-row .btn { width: auto; margin-top: 0; }
+.ext-legend-item { margin: 6px 0; padding: 6px 8px; background: #0f0f22; border-radius: 6px; font-size: 12px; }
+#ext-legend .err, .ext-legend-item .err { color: #ff6b6b; }
+
+.table-scroll { overflow-x: auto; }
+.modal-box.wide { width: 1000px; }
+.catalog td { vertical-align: top; }
+.catalog a { color: #34e89e; font-weight: 600; }
+.catalog .note { color: #f9a825; margin-top: 3px; }
+.badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; white-space: nowrap; margin: 1px 0; }
+.badge-data { background: #1f8a63; color: #fff; }
+.badge-layer { background: #2171b5; color: #fff; }
+.badge-link { background: #555; color: #fff; }
 .leaflet-image-layer.pixelated { image-rendering: pixelated; }
 
 .val-label {

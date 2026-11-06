@@ -87,6 +87,20 @@
         </div>
 
         <div class="section">
+            <h3>Global Map Layers</h3>
+            <button id="btn-catalog" class="btn btn-small">📚 All data sources &amp; how they are used</button>
+            <label class="field">Satellite date <input type="date" id="ext-date"></label>
+            <div id="ext-layers" class="layer-group"></div>
+            <label class="field">OpenWeatherMap API key
+                <div class="key-row">
+                    <input type="password" id="owm-key" placeholder="paste your free key" autocomplete="off">
+                    <button id="owm-save" class="btn btn-small">Save</button>
+                </div>
+            </label>
+            <div id="ext-legend"></div>
+        </div>
+
+        <div class="section">
             <h3>Weather Stations</h3>
             <div class="layer-group">
                 <label>
@@ -132,10 +146,7 @@
             </div>
 
             <label class="field">Data source
-                <select id="an-source">
-                    <option value="ncm">NCM station observations (measured)</option>
-                    <option value="era5">ERA5 model data (complete, all variables)</option>
-                </select>
+                <select id="an-source"></select>
             </label>
 
             <label class="field">Variable <select id="an-variable"></select></label>
@@ -262,6 +273,9 @@
                 <p><strong>ERA5 model data</strong> — ECMWF ERA5 reanalysis via the Open-Meteo Historical API, sampled at each station's coordinates.
                    It has no gaps, covers 1940 to about 6 days ago, and includes variables stations do not report (ET₀, solar radiation, soil moisture),
                    but it is a model estimate (about 25 km resolution), not a measurement.</p>
+                <p><strong>Other sources</strong> — CHIRPS and IMERG satellite rainfall (via NASA SERVIR ClimateSERV), NASA POWER, and the GFS and ECMWF forecasts
+                   (choose a future period, up to 15–16 days ahead). Satellite sources give the value of the grid cell at each station, so the methods
+                   above work the same way. The "📚 All data sources" button in the sidebar lists every source and how it is used.</p>
                 <p>NCM's official, quality-controlled archive (including climatological and rain-gauge stations) is available on request through NCM's
                    <a href="https://www.ncm.gov.sa/en/services/our-services/meteorological-data-publishing-or-utilization-service" target="_blank" rel="noopener">Meteorological Data Publishing or Utilization service</a>; NCM asks for prior approval before its data is republished.</p>
             </details>
@@ -285,23 +299,20 @@
                     <label>Until <input type="date" id="ts-until"></label>
                 </div>
                 <div class="btn-row">
-                    <button class="btn btn-small btn-secondary" data-quick="365" data-ncm="1">Latest NCM year</button>
+                    <button class="btn btn-small btn-secondary" data-quick="365" data-mode="ncm">Latest NCM year</button>
                     <button class="btn btn-small btn-secondary" data-quick="30">Last 30 days</button>
                     <button class="btn btn-small btn-secondary" data-quick="365">Last year</button>
                     <button class="btn btn-small btn-secondary" data-quick="3652">Last 10 years</button>
+                    <button class="btn btn-small btn-secondary" data-quick="16" data-mode="forecast">Next 16 days (forecast)</button>
                     <button id="ts-load" class="btn btn-small">Load period</button>
+                </div>
+                <div class="field">Data sources (tick to compare)
+                    <div id="ts-sources" class="src-grid"></div>
                 </div>
                 <div id="ts-status" class="status"></div>
 
                 <div class="form-grid">
                     <label>Chart <select id="ts-variable"></select></label>
-                    <label>Show
-                        <select id="ts-show">
-                            <option value="both">NCM observed + ERA5 model</option>
-                            <option value="ncm">NCM observed only</option>
-                            <option value="era5">ERA5 model only</option>
-                        </select>
-                    </label>
                     <label>Group by
                         <select id="ts-group">
                             <option value="daily">Daily</option>
@@ -315,9 +326,28 @@
                 <div class="btn-row">
                     <button id="ts-csv" class="btn btn-small">⬇ Download daily CSV</button>
                 </div>
-                <p class="small source">NCM observed: the station's daily observations exchanged through the WMO (NOAA NCEI Global Summary of the Day; currently until 24 Aug 2025).
-                   ERA5 model: reanalysis at the station location (Open-Meteo Historical API; 1940 to about 6 days ago).</p>
+
+                <h3 class="method-title">Outlook &amp; long-term climate</h3>
+                <div class="btn-row">
+                    <button class="btn btn-small btn-secondary" data-outlook="seasonal">🌦 ECMWF seasonal outlook (6 months)</button>
+                    <button class="btn btn-small btn-secondary" data-outlook="cmip6">🌡 CMIP6 climate projection (to 2050)</button>
+                    <button class="btn btn-small btn-secondary" data-outlook="solar">☀️ Global Solar Atlas</button>
+                </div>
+                <div id="ts-outlook"></div>
+
+                <p class="small source">Hover a source name to see where its data comes from. The "📚 All data sources" button in the sidebar lists every source and how it is used.</p>
             </div>
+        </div>
+    </div>
+
+    <!-- ============ Data source catalog ============ -->
+    <div id="catalog-modal" class="modal hidden">
+        <div class="modal-box wide">
+            <div class="panel-header">
+                <h2>Data sources</h2>
+                <button id="catalog-close" class="icon-btn" title="Close">✕</button>
+            </div>
+            <div class="panel-body" id="catalog-body"></div>
         </div>
     </div>
 
@@ -335,6 +365,9 @@
     <script src="app.js"></script>
     <script src="timeseries.js"></script>
     <script src="ncm.js"></script>
+    <script src="sources.js"></script>
     <script src="analysis.js"></script>
+    <script src="layers.js"></script>
+    <script src="catalog.js"></script>
 </body>
 </html>

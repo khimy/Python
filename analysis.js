@@ -487,7 +487,7 @@
     function renderTables(run) {
         const { results, v, method, G, from, until, source, excluded, flagged, minCoverage, pts } = run;
         const fmt = x => (x === null || x === undefined || Number.isNaN(x)) ? 'N/A' : x.toFixed(2);
-        const srcName = source === 'ncm' ? 'NCM station observations' : 'ERA5 model data';
+        const srcName = window.DATA_SOURCES[source].name;
 
         const rows = Object.entries(METHODS).map(([k, name]) => `
             <tr class="${k === method ? 'selected' : ''}" data-method="${k}">
@@ -548,23 +548,26 @@
 
     async function runAnalysis() {
         const from = $('an-from').value, until = $('an-until').value;
-        const err = DU.validateRange(from, until);
-        if (err) return setStatus(err, true);
         const g = currentGeom();
         if (!g) return setStatus('The boundary is still loading — try again in a moment.', true);
 
         const key = $('an-variable').value;
         const v = VARS[key];
         const source = $('an-source').value;
-        if ((source === 'ncm' && v.src === 'era5') || (source === 'era5' && v.src === 'ncm')) {
-            return setStatus(`${v.label} is not available from ${source === 'ncm' ? 'NCM observations' : 'ERA5'} — choose the other data source.`, true);
+        const SRC = window.DATA_SOURCES[source];
+        const rangeErr = window.sourceRangeError(source, from, until);
+        if (rangeErr) return setStatus(rangeErr, true);
+        if (!SRC.vars.includes(key)) {
+            const others = Object.values(window.DATA_SOURCES).filter(x => x.vars.includes(key)).map(x => x.name).join(', ');
+            return setStatus(`${SRC.name} does not provide ${v.label}. Sources that do: ${others}.`, true);
         }
         const minCoverage = Math.min(100, Math.max(0, Number($('an-coverage').value) || 0)) / 100;
 
         setStatus(source === 'ncm' ? 'Downloading NCM station observations (NOAA archive)…' : 'Downloading ERA5 data for the period…');
         let data;
         try {
-            data = await window.fetchSource(source, SAUDI_WEATHER_STATIONS, from, until);
+            data = await window.fetchSource(source, SAUDI_WEATHER_STATIONS, from, until,
+                (done, total) => setStatus(`Downloading ${SRC.name}: ${done} of ${total} stations…`));
         } catch (e) {
             return setStatus('Could not load data: ' + e.message, true);
         }
@@ -572,7 +575,7 @@
         const pts = [], excluded = [], flagged = [];
         SAUDI_WEATHER_STATIONS.forEach((s, i) => {
             const d = data[i];
-            if (!d?.available) { if (source === 'ncm') excluded.push(`${s.city} (no NCM observations)`); return; }
+            if (!d?.available) { excluded.push(`${s.city} (no data)`); return; }
             const series = d.daily[key] || [];
             const sm = window.summarizeSeries(series, v.agg);
             const coverage = series.length ? sm.n / series.length : 0;
@@ -629,7 +632,7 @@
     function downloadCsv() {
         if (!lastRun) return;
         const { pts, results, v, from, until } = lastRun;
-        const srcNote = lastRun.source === 'ncm' ? window.NCM_SOURCE_NOTE : 'ECMWF ERA5 reanalysis via Open-Meteo';
+        const srcNote = window.DATA_SOURCES[lastRun.source].provider;
         const lines = [`# ${v.label} (${v.unit}), ${from} to ${until}; source: ${srcNote}`, 'method,areal_value,details'];
         Object.entries(METHODS).forEach(([k, name]) =>
             lines.push(`${name},${results[k]?.value ?? ''},"${(results[k]?.note || '').replace(/"/g, "'")}"`));
@@ -685,7 +688,26 @@
         $('an-from').value = DU.shiftDate(until, -364);
         $('an-until').value = until;
         $('an-from').min = $('an-until').min = DU.ARCHIVE_MIN;
-        $('an-from').max = $('an-until').max = DU.archiveMaxDate();
+        $('an-from').max = $('an-until').max = DU.shiftDate(DU.isoDate(new Date()), 15);
+
+        // Data sources from the registry (sources.js)
+        $('an-source').innerHTML = Object.entries(window.DATA_SOURCES)
+            .map(([k, x]) => `<option value="${k}" title="${x.provider}">${x.name}${x.kind === 'forecast' ? ' (forecast)' : ''}</option>`).join('');
+        $('an-source').value = 'ncm';
+        $('an-source').addEventListener('change', () => {
+            // Move the period into the new source's coverage if needed
+            const k = $('an-source').value, r = window.DATA_SOURCES[k].range();
+            if (window.sourceRangeError(k, $('an-from').value, $('an-until').value)) {
+                if (window.DATA_SOURCES[k].kind === 'forecast') {
+                    const t = DU.isoDate(new Date());
+                    $('an-from').value = t; $('an-until').value = r.max;
+                } else {
+                    const end = (k === 'ncm' && window.NCM_DATA_END < r.max) ? window.NCM_DATA_END : r.max;
+                    $('an-until').value = end; $('an-from').value = DU.shiftDate(end, -29);
+                }
+                setStatus(`Period changed to ${$('an-from').value} → ${$('an-until').value} (${window.DATA_SOURCES[k].name} covers ${r.min} to ${r.max}).`);
+            }
+        });
 
         $('an-variable').innerHTML = Object.entries(VARS)
             .map(([k, v]) => `<option value="${k}">${v.label} (${v.unit})</option>`).join('');
