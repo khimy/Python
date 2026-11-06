@@ -38,6 +38,9 @@
 
     baseMaps.osm.addTo(map);
 
+    // Shared with timeseries.js and analysis.js
+    window.WX = { map };
+
     // --- Base map radio buttons ---
     document.querySelectorAll('input[name="basemap"]').forEach(radio => {
         radio.addEventListener('change', function () {
@@ -118,6 +121,7 @@
         html += `<div class="popup-row"><span class="popup-label">Type:</span><span class="popup-value">${station.type}</span></div>`;
         html += `<div class="popup-row"><span class="popup-label">Elevation:</span><span class="popup-value">${station.elevation} m</span></div>`;
         html += `<div class="popup-row"><span class="popup-label">Lat / Lon:</span><span class="popup-value">${station.lat.toFixed(4)}, ${station.lon.toFixed(4)}</span></div>`;
+        html += `<button class="btn btn-small popup-btn" onclick="openTimeSeries('${station.id}')">📈 Time series — choose From / Until</button>`;
 
         if (weather) {
             html += `<div class="popup-section">Current Weather</div>`;
@@ -212,6 +216,7 @@
         rows.forEach(([label, value]) => {
             html += `<div class="info-row"><span class="info-label">${label}</span><span class="info-value">${value}</span></div>`;
         });
+        html += `<button class="btn" onclick="openTimeSeries('${station.id}')">📈 Time series — choose From / Until</button>`;
 
         container.innerHTML = html;
     }
@@ -601,12 +606,6 @@
     document.getElementById('btn-refresh').addEventListener('click', () => {
         loadStations();
     });
-
-    // --- Saudi Arabia boundary outline ---
-    const saudiBorder = L.rectangle(
-        [[16.0, 34.5], [32.5, 55.7]],
-        { color: '#34e89e', weight: 1, fill: false, dashArray: '8, 4', opacity: 0.4 }
-    ).addTo(map);
 
     // --- Scale control ---
     L.control.scale({ imperial: false }).addTo(map);

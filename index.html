@@ -114,13 +114,187 @@
 
     <div id="map"></div>
 
+    <button id="btn-analysis" class="map-btn">📊 Areal Analysis &amp; Methods</button>
+
+    <!-- ============ Areal analysis panel ============ -->
+    <div id="analysis-panel" class="hidden">
+        <div class="panel-header">
+            <h2>Areal Analysis</h2>
+            <button id="an-close" class="icon-btn" title="Close">✕</button>
+        </div>
+
+        <div class="panel-body">
+            <p class="small">Average a variable over an area for a period you choose, and compare the standard methods side by side.</p>
+
+            <div class="form-grid">
+                <label>From <input type="date" id="an-from"></label>
+                <label>Until <input type="date" id="an-until"></label>
+            </div>
+
+            <label class="field">Variable <select id="an-variable"></select></label>
+
+            <label class="field">Boundary
+                <select id="an-boundary">
+                    <option value="national">Saudi Arabia (national boundary)</option>
+                    <option value="custom">Custom boundary (draw on map)</option>
+                </select>
+            </label>
+            <div class="btn-row">
+                <button id="an-draw" class="btn btn-small">✏️ Draw boundary</button>
+                <button id="an-finish" class="btn btn-small" disabled>✔ Finish</button>
+            </div>
+
+            <label class="field">Method shown on map <select id="an-method"></select></label>
+
+            <details class="options">
+                <summary>Method options</summary>
+                <label class="field">Grid resolution
+                    <select id="an-res">
+                        <option value="0.25">0.25° (~28 km, fast)</option>
+                        <option value="0.1" selected>0.1° (~11 km)</option>
+                        <option value="0.05">0.05° (~5.5 km, slow)</option>
+                    </select>
+                </label>
+                <label class="field">IDW power (p) <input type="number" id="an-power" value="2" min="0.5" max="6" step="0.5"></label>
+                <label class="field">Spline smoothing (λ, 0 = exact) <input type="number" id="an-smooth" value="0" min="0" step="0.1"></label>
+                <label class="field">Isohyet interval (blank = automatic) <input type="number" id="an-interval" min="0" step="any" placeholder="auto"></label>
+                <label class="field">Draw isohyets from
+                    <select id="an-isobase">
+                        <option value="idw">Inverse Distance Weighting</option>
+                        <option value="spline">Thin-Plate Spline</option>
+                        <option value="kriging">Ordinary Kriging</option>
+                    </select>
+                </label>
+            </details>
+
+            <div class="btn-row">
+                <button id="an-run" class="btn">▶ Run analysis</button>
+                <button id="an-clear" class="btn btn-small btn-secondary">Clear</button>
+                <button id="an-csv" class="btn btn-small btn-secondary">⬇ CSV</button>
+            </div>
+            <div id="an-status" class="status"></div>
+            <div id="an-legend"></div>
+            <div id="an-results"></div>
+
+            <h3 class="method-title">Methodology</h3>
+            <p class="small">P = areal value, Pᵢ = value at station i, A = total area, n = number of stations.
+               Station values are the period totals (precipitation, ET₀, radiation, sunshine) or period means (temperature, humidity, soil moisture, wind).</p>
+
+            <details class="method">
+                <summary>1. Arithmetic Mean</summary>
+                <p class="formula">P = (P₁ + P₂ + … + Pₙ) / n</p>
+                <p>The simple average of the stations that lie <em>inside</em> the boundary. Every station has the same weight.
+                   It is fine for flat areas with evenly spaced stations and small differences between them, but is biased when stations are clustered (for example many stations on the coast).</p>
+            </details>
+
+            <details class="method">
+                <summary>2. Thiessen Polygons</summary>
+                <p class="formula">P = Σ (Aᵢ · Pᵢ) / A</p>
+                <p>Each point in the area is given to its nearest station, which divides the area into polygons (perpendicular bisectors between neighbouring stations).
+                   Each station is weighted by the area of its polygon inside the boundary, Aᵢ / A. Stations just outside the boundary also count when their polygon reaches inside.
+                   It corrects for uneven station spacing but ignores terrain, and values jump at polygon edges.</p>
+                <p class="small">Here the polygons are computed on the grid (each cell goes to its nearest station) and cell areas use the exact spherical area of each latitude/longitude cell.</p>
+            </details>
+
+            <details class="method">
+                <summary>3. Isohyetal Method</summary>
+                <p class="formula">P = Σ [Aⱼ · (Iⱼ + Iⱼ₊₁) / 2] / A</p>
+                <p>Lines of equal value (isohyets) are drawn from the station values. The area Aⱼ between two neighbouring isohyets Iⱼ and Iⱼ₊₁ is multiplied by their average, and the results are summed.
+                   It is usually the most accurate classic method because it follows the real pattern of rainfall, including the effect of mountains, if the isohyets are drawn well.</p>
+                <p class="small">Instead of drawing the lines by hand, the surface is interpolated (IDW, spline or kriging, see options) and contoured at the chosen interval. Because each band uses the midpoint of its two isohyets, a dry area in the lowest band is counted at half the interval.</p>
+            </details>
+
+            <details class="method">
+                <summary>4. Inverse Distance Weighting (IDW)</summary>
+                <p class="formula">P(x) = Σ wᵢ Pᵢ / Σ wᵢ ,  wᵢ = 1 / dᵢᵖ</p>
+                <p>The value at each grid point is a weighted average of all stations; closer stations get more weight. With p = 2 this is the classic <em>reciprocal distance squared</em> method.
+                   The areal value is the area-weighted mean of the grid inside the boundary. A larger p gives more local, "bull's-eye" patterns.</p>
+            </details>
+
+            <details class="method">
+                <summary>5. Thin-Plate Spline</summary>
+                <p class="formula">P(x) = a₀ + a₁x + a₂y + Σ wᵢ · φ(‖x − xᵢ‖),  φ(r) = r² ln r</p>
+                <p>A smooth surface that passes through every station (λ = 0) while bending as little as possible. Setting a smoothing λ &gt; 0 lets the surface miss stations slightly to reduce wiggles.
+                   It gives smooth, realistic patterns but can overshoot between stations; negative values are set to zero for variables that cannot be negative.</p>
+            </details>
+
+            <details class="method">
+                <summary>6. Ordinary Kriging</summary>
+                <p class="formula">P(x₀) = Σ λᵢ Pᵢ ,  Σ λᵢ = 1</p>
+                <p class="formula">γ(h) = c₀ + c · (1 − e^(−3h/a))</p>
+                <p>A geostatistical method. First the semivariogram γ(h) — how different two stations are as a function of their distance h — is estimated from the data and fitted with an exponential model (nugget c₀, sill c₀ + c, range a).
+                   The weights λᵢ are then chosen to give the unbiased estimate with the smallest error variance. It accounts for clustering and spatial correlation, but needs enough stations for a reliable variogram.</p>
+                <p class="small">The variogram is fitted automatically by weighted least squares on 12 distance classes; the fitted values are shown in the results.</p>
+            </details>
+
+            <details class="method">
+                <summary>Boundary mean</summary>
+                <p>All the grid methods (Thiessen, Isohyetal, IDW, Spline, Kriging) give the area-weighted mean <em>inside the selected boundary</em>:
+                   P = Σ (Aₖ · Pₖ) / Σ Aₖ over the grid cells k inside it. Choose the national boundary or draw your own catchment / region on the map.
+                   Stations outside the boundary still help the interpolation near the edge; only the Arithmetic Mean uses stations inside the boundary alone.</p>
+            </details>
+
+            <p class="small source">Data: ERA5 reanalysis (Copernicus/ECMWF) via the Open-Meteo Historical API, sampled at each station's coordinates. These are model values at the station locations, not the stations' own gauge records.</p>
+        </div>
+    </div>
+
+    <!-- ============ Station time series window ============ -->
+    <div id="ts-modal" class="modal hidden">
+        <div class="modal-box">
+            <div class="panel-header">
+                <div>
+                    <h2 id="ts-title">Station</h2>
+                    <div id="ts-meta" class="small"></div>
+                </div>
+                <button id="ts-close" class="icon-btn" title="Close">✕</button>
+            </div>
+            <div class="panel-body">
+                <label class="field">Station <select id="ts-station"></select></label>
+                <div class="form-grid">
+                    <label>From <input type="date" id="ts-from"></label>
+                    <label>Until <input type="date" id="ts-until"></label>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-small btn-secondary" data-quick="30">Last 30 days</button>
+                    <button class="btn btn-small btn-secondary" data-quick="365">Last year</button>
+                    <button class="btn btn-small btn-secondary" data-quick="3652">Last 10 years</button>
+                    <button id="ts-load" class="btn btn-small">Load period</button>
+                </div>
+                <div id="ts-status" class="status"></div>
+
+                <div class="form-grid">
+                    <label>Chart <select id="ts-variable"></select></label>
+                    <label>Group by
+                        <select id="ts-group">
+                            <option value="daily">Daily</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="chart-wrap"><canvas id="ts-chart"></canvas></div>
+                <div id="ts-summary"></div>
+                <div class="btn-row">
+                    <button id="ts-csv" class="btn btn-small">⬇ Download daily CSV</button>
+                </div>
+                <p class="small source">Daily ERA5 reanalysis values at the station location (Open-Meteo Historical API). Available from 1940 to about 6 days ago.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="loading-overlay" style="display:none;">
         <div class="spinner"></div>
         <p>Loading weather data...</p>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-contour@4.0.2/dist/d3-contour.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="stations.js"></script>
     <script src="app.js"></script>
+    <script src="timeseries.js"></script>
+    <script src="analysis.js"></script>
 </body>
 </html>
