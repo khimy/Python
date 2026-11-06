@@ -146,7 +146,9 @@
                             <a href="https://code.earthengine.google.com/register" target="_blank" rel="noopener">code.earthengine.google.com/register</a>.</li>
                         <li>In the Google Cloud Console for that project, enable the <b>Earth Engine API</b>.</li>
                         <li>APIs &amp; Services → Credentials → <b>Create OAuth client ID</b> → Web application. Add
-                            <code id="gee-origin"></code> (this site's address) under <b>Authorised JavaScript origins</b>.</li>
+                            <code id="gee-origin"></code> (this site's address) under <b>Authorised JavaScript origins</b>.
+                            Google only accepts plain <code>http://</code> addresses for <code>localhost</code>, so if you opened the site as
+                            <code>http://swema/</code>, open <code>http://localhost/</code> to sign in.</li>
                         <li>Paste the client ID and project ID above and press Sign in. They are saved only in this browser.</li>
                     </ol>
                 </details>
