@@ -38,6 +38,9 @@
 
     baseMaps.osm.addTo(map);
 
+    // Map key in the bottom-right corner (legend.js)
+    window.MapKey.attach(map);
+
     // Shared with timeseries.js and analysis.js
     window.WX = { map };   // more fields (layers, legends, live data) are added below
 
@@ -518,8 +521,10 @@
             if (layerName === 'stations') {
                 if (this.checked) {
                     stationLayerGroup.addTo(map);
+                    window.MapKey.set('stations', STATION_KEY);
                 } else {
                     map.removeLayer(stationLayerGroup);
+                    window.MapKey.remove('stations');
                 }
                 return;
             }
@@ -536,7 +541,7 @@
                 updateLegend(layerName);
             } else {
                 map.removeLayer(layer);
-                clearLegendIfLast();
+                window.MapKey.remove('wx:' + layerName);
             }
         });
     });
@@ -544,9 +549,9 @@
     // --- Legend management ---
     const legendConfigs = window.WX.legendConfigs = {
         dem: {
-            title: 'DEM Elevation',
-            gradient: 'linear-gradient(to right, #006400, #90EE90, #FFFF00, #8B4513, #FFFFFF)',
-            labels: ['0m', '500m', '1000m', '2000m', '3000m+']
+            title: 'Terrain (OpenTopoMap)',
+            sub: 'Hill shading with contour lines; contour labels give elevation in metres',
+            note: 'For a 30 m elevation model with a colour scale use Copernicus DEM in Google Earth Engine.'
         },
         precipitation: {
             title: 'Precipitation',
@@ -555,8 +560,8 @@
         },
         temperature: {
             title: 'Temperature',
-            gradient: 'linear-gradient(to right, #0000ff, #00cc66, #ffcc00, #ff0000)',
-            labels: ['0°C', '20°C', '35°C', '50°C']
+            gradient: 'linear-gradient(to right, #0000ff, #00cc66, #ff0000)',
+            labels: ['0', '25', '50 °C']
         },
         humidity: {
             title: 'Relative Humidity',
@@ -595,31 +600,35 @@
         hcho: { title: 'Formaldehyde (HCHO)', gradient: 'linear-gradient(to right, #fff7f3, #f768a1, #49006a)', labels: ['0', '5', '10+ µg/m³'] },
         co2: { title: 'Carbon Dioxide (CO₂)', gradient: 'linear-gradient(to right, #ffffcc, #fd8d3c, #800026)', labels: ['410', '440', '470+ ppm'] },
         ch4: { title: 'Methane (CH₄)', gradient: 'linear-gradient(to right, #f7fcf5, #41ab5d, #00441b)', labels: ['1300', '1600', '1900+ µg/m³'] },
-        wind: { title: 'Wind speed & direction', gradient: 'linear-gradient(to right, #c6dbef, #6baed6, #2171b5, #08306b)', labels: ['0', '15', '30', '45+ km/h'] },
+        wind: { title: 'Wind speed & direction', sub: 'Arrows point downwind; large arrows = stations',
+                swatches: [{ color: '#9ecae1', label: '< 10 km/h' }, { color: '#4292c6', label: '10–20' }, { color: '#2171b5', label: '20–30' },
+                           { color: '#08519c', label: '30–45' }, { color: '#e6550d', label: '≥ 45 km/h' }] },
         visibility: { title: 'Visibility', gradient: 'linear-gradient(to right, #67000d, #fcbba1, #f7fbff)', labels: ['0 km', '12 km', '24+ km'] },
         vpd: { title: 'Vapour Pressure Deficit', gradient: 'linear-gradient(to right, #f7fcf0, #7bccc4, #084081)', labels: ['0', '4', '8+ kPa'] },
         gusts: { title: 'Wind Gusts', gradient: 'linear-gradient(to right, #f7fbff, #6baed6, #08306b)', labels: ['0', '50', '100+ km/h'] },
     };
 
+    // Station marker colours follow getTemperatureColor()
+    const STATION_KEY = {
+        title: 'Weather stations', sub: 'Marker colour = current temperature',
+        swatches: [
+            { color: '#0000ff', label: '≤ 0 °C' }, { color: '#00aaff', label: '0–10' }, { color: '#00cc66', label: '10–20' },
+            { color: '#ffcc00', label: '20–30' }, { color: '#ff6600', label: '30–40' }, { color: '#ff0000', label: '> 40 °C' },
+            { color: '#34e89e', label: 'no data' }
+        ]
+    };
+    if (document.getElementById('layer-stations')?.checked) window.MapKey.set('stations', STATION_KEY);
+
+    // Station-value layers are drawn as circles around each station (live readings)
     function updateLegend(layerName) {
         const config = legendConfigs[layerName];
         if (!config) return;
-
-        const container = document.getElementById('legend-container');
-        container.innerHTML = `
-            <strong>${config.title}</strong>
-            <div class="legend-gradient" style="background: ${config.gradient};"></div>
-            <div class="legend-labels">
-                ${config.labels.map(l => `<span>${l}</span>`).join('')}
-            </div>
-        `;
-    }
-
-    function clearLegendIfLast() {
-        const anyChecked = document.querySelectorAll('input[data-layer]:checked:not([data-layer="stations"])');
-        if (anyChecked.length === 0) {
-            document.getElementById('legend-container').innerHTML = '<p class="legend-hint">Enable a layer to see its legend</p>';
-        }
+        window.MapKey.set('wx:' + layerName, {
+            title: config.title,
+            sub: config.sub || (layerName === 'dem' ? '' : 'Live value at each station (circles)'),
+            gradient: config.gradient, labels: config.labels,
+            swatches: config.swatches, note: config.note
+        });
     }
 
     // --- Refresh button ---

@@ -59,6 +59,32 @@
         owm_wind:   { group: 'OpenWeatherMap (API key)', label: 'Wind speed now', owm: 'wind_new', legend: 'OpenWeatherMap current wind speed.' },
     };
 
+    // Colour keys for the map-key panel. NASA layers use the official Worldview / GIBS colour scales
+    // (10 colours sampled from each; labels = values at the left end, middle and right end of the bar).
+    const KEYS = {
+        imerg: { colors: ["#00764e", "#00971f", "#2db800", "#99d900", "#fad200", "#ff6c1f", "#ff1313", "#c80000", "#7d0000", "#330000"], labels: ["0.1", "2.4", "53"], unit: 'mm/h' },
+        grace: { colors: ["#0033ff", "#3960ff", "#728dff", "#aabaff", "#e3e7ff", "#ffe7e3", "#ffbaab", "#ff8d72", "#ff6039", "#ff3300"], labels: ["-30", "0", "30"], unit: 'cm of water' },
+        smap: { colors: ["#ffa200", "#ffe500", "#acd500", "#008200", "#00d6ae", "#00b2ff", "#000cff", "#00009e", "#181864", "#505050"], labels: ["0", "0.35", "0.7"], unit: 'm³/m³' },
+        gldas: { colors: ["#9e0142", "#eb5f46", "#f7884f", "#fdbc6c", "#fae38c", "#e9f296", "#bbe3a0", "#83cda4", "#57b1ab", "#5e4fa2"], labels: ["0", "25", "50"], unit: 'kg/m² (0–10 cm)' },
+        merra2: { colors: ["#f7fcfd", "#d5efed", "#bbe5dc", "#9ad8c9", "#76c9af", "#59bb94", "#40ad74", "#2c9654", "#167f3b", "#00441b"], labels: ["0", "9.1", "18.1"], unit: 'mm/day' },
+        lst: { colors: ["#c900ff", "#5900ff", "#0024ff", "#00b3ff", "#33ff89", "#95ff00", "#ffff00", "#ffac00", "#ff5500", "#ff0100"], labels: ["-73", "2", "77"], unit: '°C' },
+        ndvi: { colors: ["#f1ecec", "#e5dbce", "#c0b097", "#ac8d73", "#b0cf68", "#80b006", "#4e9401", "#217800", "#006000", "#001801"], labels: ["0", "0.38", "1"], unit: 'NDVI' },
+        aod: { colors: ["#fffdcd", "#ffea81", "#ffd257", "#ffaf36", "#ff8723", "#ff5818", "#f52810", "#db0c0b", "#b2000e", "#7d000e"], labels: ["0", "0.38", "5"], unit: 'optical depth' },
+        gas_no2: { colors: ["#fffcc7", "#ffec87", "#ffdc66", "#ffc94c", "#ffab34", "#ff8d25", "#ff711e", "#ff4915", "#f52810", "#7f000e"], labels: ["0", "10", "20"], unit: '×10¹⁵ molecules/cm²' },
+        gas_so2: { colors: ["#082864", "#08519b", "#1f6eb3", "#3a8ac2", "#5ca4d0", "#86bcdb", "#add0e6", "#ccdff0", "#e2edf8", "#f7fbff"], labels: ["0.5", "2.5", "4.5"], unit: 'Dobson units' },
+        gas_o3: { colors: ["#5e4fa2", "#56b0ac", "#85cea4", "#b6e2a1", "#e3f498", "#f6e68f", "#fdcb79", "#fba35c", "#f47245", "#9e0142"], labels: ["100", "300", "500"], unit: 'Dobson units' },
+        gas_ch4: { colors: ["#f2f3f6", "#cbe7c8", "#b1e4ae", "#a5d37e", "#b3b55c", "#d88b47", "#e16849", "#d8494e", "#962936", "#3e0015"], labels: ["1600", "1800", "2000"], unit: 'ppb (400 hPa)' },
+        gas_ch4m: { colors: ["#f2f3f6", "#cbe7c8", "#b1e4ae", "#a5d37e", "#b3b55c", "#d88b47", "#e16849", "#d8494e", "#962936", "#3e0015"], labels: ["1600", "1800", "2000"], unit: 'ppb (400 hPa)' },
+        gas_co2: { colors: ["#440154", "#482878", "#3e4989", "#31678e", "#26838e", "#1e9b8a", "#31b57b", "#65cb5e", "#aadc32", "#f6e620"], labels: ["380", "430", "480"], unit: 'ppm' },
+        gas_co: { colors: ["#fffdda", "#fffdc4", "#fff79e", "#fbb956", "#fc654c", "#d33825", "#a9202a", "#9b279f", "#7f35f6", "#2f054a"], labels: ["0", "175", "350"], unit: 'ppb (500 hPa)' },
+        truecolor: { note: 'Natural-colour satellite photo — no colour scale.' },
+        gfw: { swatches: [{ color: '#dc6699', label: 'Tree cover lost since 2001' }] },
+        owm_precip: { colors: ['#e1c86400', '#c8969680', '#9696aa', '#7878be', '#6e6ecd', '#5050e1', '#1414ff'], labels: ['light', 'moderate', 'heavy'], unit: 'rain' },
+        owm_clouds: { colors: ['#ffffff00', '#fdfdff40', '#fbfbff80', '#f7f7ffc0', '#f0f0ff'], labels: ['clear', 'partly', 'overcast'], unit: 'cloud cover' },
+        owm_temp: { colors: ['#821692', '#8257db', '#208cec', '#20c4e8', '#23dddd', '#c2ff28', '#fff028', '#ffc228', '#fc8014'], labels: ['−40', '0', '30 °C'], unit: '°C (approx.)' },
+        owm_wind: { colors: ['#ffffff00', '#eeceff', '#b364bc', '#3f213b', '#744cac', '#4600af', '#0d1126'], labels: ['calm', 'strong', 'storm'], unit: 'wind' },
+    };
+
     const active = {};   // key -> Leaflet layer
 
     function owmKey() {
@@ -131,6 +157,11 @@
                 return;
             }
             active[key] = layer.addTo(map);
+            const cfg = LAYERS[key], k = KEYS[key] || {};
+            const source = cfg.gibs ? `NASA GIBS · ${layerDate(cfg)}` : cfg.owm ? 'OpenWeatherMap · now (approximate colours)' : cfg.group;
+            window.MapKey.set('ext:' + key, { title: cfg.label, sub: source, ...k });
+        } else {
+            window.MapKey.remove('ext:' + key);
         }
         updateNote();
     }

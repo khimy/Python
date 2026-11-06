@@ -477,7 +477,13 @@
               .addTo(resultLayer);
         });
 
-        // Legend
+        // Key in the map corner and in the panel
+        window.MapKey.set('analysis', {
+            title: `${METHODS[method]} — ${v.label}`,
+            sub: `${window.DATA_SOURCES[run.source]?.name || ''} · ${run.from} → ${run.until} · ${v.agg === 'sum' ? 'period total' : 'period mean'}`,
+            colors, labels: [lo.toFixed(1), ((lo + hi) / 2).toFixed(1), hi.toFixed(1)], unit: v.unit,
+            note: method === 'arithmetic' ? 'Arithmetic mean has no surface; dots show station values.' : ''
+        });
         const grad = `linear-gradient(to right, ${colors.join(',')})`;
         $('an-legend').innerHTML = `
             <div class="legend-gradient" style="background:${grad};"></div>
@@ -728,6 +734,7 @@
         $('an-finish').addEventListener('click', finishDrawing);
         $('an-clear').addEventListener('click', () => {
             resultLayer.clearLayers();
+            window.MapKey.remove('analysis');
             $('an-results').innerHTML = '';
             $('an-legend').innerHTML = '';
             lastRun = null;

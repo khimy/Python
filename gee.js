@@ -164,6 +164,12 @@
             if (layer) map.removeLayer(layer);
             layer = L.tileLayer(mapId.urlFormat, { opacity: 0.8, attribution: 'Google Earth Engine' }).addTo(map);
             legend(cfg, max);
+            window.MapKey.set('gee', {
+                title: cfg.label, unit: cfg.unit,
+                sub: `Google Earth Engine · ${cfg.static ? 'static' : `${p.from} → ${p.until} · ${cfg.reducer === 'sum' ? 'total' : 'mean'}`}`,
+                colors: cfg.palette.map(c => '#' + c),
+                labels: [cfg.min, +((cfg.min + max) / 2).toPrecision(3), max].map(String)
+            });
             status(`✓ ${cfg.label} on the map (${cfg.static ? 'static dataset' : p.from + ' → ' + p.until}).`);
         });
     }
@@ -340,6 +346,7 @@ Export.table.toDrive({collection: series, description: '${key}_daily_${from}_${u
         $('gee-series').addEventListener('click', () => eeReady ? stationSeries() : status('Sign in first, or use "Code Editor script".', true));
         $('gee-clear').addEventListener('click', () => {
             if (layer) { map.removeLayer(layer); layer = null; }
+            window.MapKey.remove('gee');
             $('gee-legend').innerHTML = ''; $('gee-results').innerHTML = '';
         });
         $('gee-script-btn').addEventListener('click', showScript);
