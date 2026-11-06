@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saudi Arabia Weather & Environmental Data Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <h1>🇸🇦 Saudi Arabia</h1>
+            <h2>Weather & Environmental Data</h2>
+        </div>
+
+        <div class="section">
+            <h3>Base Maps</h3>
+            <div class="layer-group">
+                <label><input type="radio" name="basemap" value="osm" checked> OpenStreetMap</label>
+                <label><input type="radio" name="basemap" value="satellite"> Satellite Imagery</label>
+                <label><input type="radio" name="basemap" value="terrain"> Terrain</label>
+                <label><input type="radio" name="basemap" value="dark"> Dark Mode</label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Satellite & Elevation Data</h3>
+            <div class="layer-group">
+                <label>
+                    <input type="checkbox" id="layer-dem" data-layer="dem">
+                    DEM 10m Resolution
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-soil" data-layer="soil">
+                    Soil Moisture
+                </label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Weather Data Layers</h3>
+            <div class="layer-group">
+                <label>
+                    <input type="checkbox" id="layer-precip" data-layer="precipitation">
+                    Precipitation
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-temp" data-layer="temperature">
+                    Mean Temperature
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-humidity" data-layer="humidity">
+                    Humidity
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-evap" data-layer="evaporation">
+                    Evaporation
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-pet" data-layer="pet">
+                    Potential Evapotranspiration
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-solar" data-layer="solar">
+                    Solar Radiation
+                </label>
+                <label>
+                    <input type="checkbox" id="layer-wind" data-layer="wind">
+                    Wind Speed &amp; Direction (arrows)
+                </label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Environmental Parameters</h3>
+            <div class="layer-group">
+                <label><input type="checkbox" data-layer="dust"> Dust Concentration</label>
+                <label><input type="checkbox" data-layer="pm10"> PM10</label>
+                <label><input type="checkbox" data-layer="pm25"> PM2.5</label>
+                <label><input type="checkbox" data-layer="aod"> Aerosol Optical Depth</label>
+                <label><input type="checkbox" data-layer="uv"> UV Index</label>
+                <label><input type="checkbox" data-layer="visibility"> Visibility</label>
+                <label><input type="checkbox" data-layer="vpd"> Vapour Pressure Deficit</label>
+                <label><input type="checkbox" data-layer="gusts"> Wind Gusts</label>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Atmospheric Gases</h3>
+            <div class="ext-group-title">At stations now — Copernicus CAMS</div>
+            <div class="layer-group">
+                <label><input type="checkbox" data-layer="no2"> Nitrogen Dioxide (NO₂)</label>
+                <label><input type="checkbox" data-layer="so2"> Sulphur Dioxide (SO₂)</label>
+                <label><input type="checkbox" data-layer="hcho"> Formaldehyde (HCHO)</label>
+                <label><input type="checkbox" data-layer="co2"> Carbon Dioxide (CO₂)</label>
+                <label><input type="checkbox" data-layer="ch4"> Methane (CH₄)</label>
+                <label><input type="checkbox" data-layer="ozone"> Ozone (O₃), ground level</label>
+                <label><input type="checkbox" data-layer="co"> Carbon Monoxide (CO)</label>
+            </div>
+            <label class="field">Satellite date <input type="date" id="gas-date"></label>
+            <div id="gas-layers" class="layer-group"></div>
+            <p class="small">No NASA map exists for formaldehyde: use Sentinel-5P in <b>Google Earth Engine</b> below (it also has NO₂, SO₂, CH₄, O₃ and CO at ~7 km).
+               Daily and period values for all gases: "CAMS air quality" in each station's time series and in the Areal Analysis.</p>
+            <div id="gas-legend"></div>
+        </div>
+
+        <div class="section">
+            <h3>Google Earth Engine</h3>
+            <label class="field">Dataset <select id="gee-dataset"></select></label>
+            <p class="small">Sentinel-5P arrives within days; ERA5-Land, TerraClimate, GRACE and MODIS ET are added to Earth Engine weeks to months later —
+               if a map or table is empty, choose an earlier period.</p>
+            <div class="form-grid">
+                <label>From <input type="date" id="gee-from"></label>
+                <label>Until <input type="date" id="gee-until"></label>
+            </div>
+            <button id="gee-script-btn" class="btn btn-small">📝 Code Editor script (no setup)</button>
+            <div id="gee-script-box" class="hidden">
+                <textarea id="gee-script" class="script-box" rows="8" readonly></textarea>
+                <div class="btn-row">
+                    <button id="gee-copy" class="btn btn-small">Copy</button>
+                    <a class="btn btn-small btn-link" href="https://code.earthengine.google.com/" target="_blank" rel="noopener">Open Code Editor ↗</a>
+                </div>
+            </div>
+
+            <details class="options">
+                <summary>Run inside this site (sign in)</summary>
+                <label class="field">OAuth client ID <input type="text" id="gee-client" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off"></label>
+                <label class="field">Earth Engine Cloud project ID <input type="text" id="gee-project" placeholder="my-ee-project" autocomplete="off"></label>
+                <button id="gee-signin" class="btn btn-small">🔑 Sign in with Google</button>
+                <div id="gee-tools" class="hidden">
+                    <div class="btn-row">
+                        <button id="gee-map" class="btn btn-small">🗺 Show on map</button>
+                        <button id="gee-values" class="btn btn-small">📍 Station values</button>
+                    </div>
+                    <div class="btn-row">
+                        <select id="gee-station"></select>
+                        <button id="gee-series" class="btn btn-small">📈 Daily series</button>
+                        <button id="gee-clear" class="btn btn-small btn-secondary">Clear</button>
+                    </div>
+                </div>
+                <details class="method">
+                    <summary>How to set up</summary>
+                    <ol class="small setup">
+                        <li>Register a Google Cloud project for Earth Engine (free for non-commercial use):
+                            <a href="https://code.earthengine.google.com/register" target="_blank" rel="noopener">code.earthengine.google.com/register</a>.</li>
+                        <li>In the Google Cloud Console for that project, enable the <b>Earth Engine API</b>.</li>
+                        <li>APIs &amp; Services → Credentials → <b>Create OAuth client ID</b> → Web application. Add
+                            <code id="gee-origin"></code> (this site's address) under <b>Authorised JavaScript origins</b>.
+                            Google only accepts plain <code>http://</code> addresses for <code>localhost</code>, so if you opened the site as
+                            <code>http://swema/</code>, open <code>http://localhost/</code> to sign in.</li>
+                        <li>Paste the client ID and project ID above and press Sign in. They are saved only in this browser.</li>
+                    </ol>
+                </details>
+            </details>
+            <div id="gee-status" class="status"></div>
+            <div id="gee-legend"></div>
+            <div id="gee-results"></div>
+        </div>
+
+        <div class="section">
+            <h3>Global Map Layers</h3>
+            <button id="btn-catalog" class="btn btn-small">📚 All data sources &amp; how they are used</button>
+            <label class="field">Satellite date <input type="date" id="ext-date"></label>
+            <div id="ext-layers" class="layer-group"></div>
+            <label class="field">OpenWeatherMap API key
+                <div class="key-row">
+                    <input type="password" id="owm-key" placeholder="paste your free key" autocomplete="off">
+                    <button id="owm-save" class="btn btn-small">Save</button>
+                </div>
+            </label>
+            <div id="ext-legend"></div>
+        </div>
+
+        <div class="section">
+            <h3>Weather Stations</h3>
+            <div class="layer-group">
+                <label>
+                    <input type="checkbox" id="layer-stations" data-layer="stations" checked>
+                    Show Weather Stations
+                </label>
+            </div>
+            <button id="btn-refresh" class="btn">🔄 Refresh Live Data</button>
+        </div>
+
+        <div class="section">
+            <h3>Legend</h3>
+            <div id="legend-container">
+                <p class="legend-hint">The key for every layer you switch on appears in the bottom-right corner of the map. Click its title to fold it away.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Station Info</h3>
+            <div id="station-info">
+                <p class="info-hint">Click a station marker for details</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <button id="btn-analysis" class="map-btn">📊 Areal Analysis &amp; Methods</button>
+
+    <!-- ============ Areal analysis panel ============ -->
+    <div id="analysis-panel" class="hidden">
+        <div class="panel-header">
+            <h2>Areal Analysis</h2>
+            <button id="an-close" class="icon-btn" title="Close">✕</button>
+        </div>
+
+        <div class="panel-body">
+            <p class="small">Average a variable over an area for a period you choose, and compare the standard methods side by side.</p>
+
+            <div class="form-grid">
+                <label>From <input type="date" id="an-from"></label>
+                <label>Until <input type="date" id="an-until"></label>
+            </div>
+
+            <label class="field">Data source
+                <select id="an-source"></select>
+            </label>
+
+            <label class="field">Variable <select id="an-variable"></select></label>
+
+            <label class="field">Boundary
+                <select id="an-boundary">
+                    <option value="national">Saudi Arabia (national boundary)</option>
+                    <option value="custom">Custom boundary (draw on map)</option>
+                </select>
+            </label>
+            <div class="btn-row">
+                <button id="an-draw" class="btn btn-small">✏️ Draw boundary</button>
+                <button id="an-finish" class="btn btn-small" disabled>✔ Finish</button>
+            </div>
+
+            <label class="field">Method shown on map <select id="an-method"></select></label>
+
+            <details class="options">
+                <summary>Method options</summary>
+                <label class="field">Grid resolution
+                    <select id="an-res">
+                        <option value="0.25">0.25° (~28 km, fast)</option>
+                        <option value="0.1" selected>0.1° (~11 km)</option>
+                        <option value="0.05">0.05° (~5.5 km, slow)</option>
+                    </select>
+                </label>
+                <label class="field">Minimum days reported per station (%) <input type="number" id="an-coverage" value="80" min="0" max="100" step="5"></label>
+                <label class="field">NCM rainfall: stations with rain days missing an amount
+                    <select id="an-rainmissing">
+                        <option value="exclude">Leave them out (recommended)</option>
+                        <option value="include">Use them anyway (their totals are too low)</option>
+                    </select>
+                </label>
+                <label class="field">IDW power (p) <input type="number" id="an-power" value="2" min="0.5" max="6" step="0.5"></label>
+                <label class="field">Spline smoothing (λ, 0 = exact) <input type="number" id="an-smooth" value="0" min="0" step="0.1"></label>
+                <label class="field">Isohyet interval (blank = automatic) <input type="number" id="an-interval" min="0" step="any" placeholder="auto"></label>
+                <label class="field">Draw isohyets from
+                    <select id="an-isobase">
+                        <option value="idw">Inverse Distance Weighting</option>
+                        <option value="spline">Thin-Plate Spline</option>
+                        <option value="kriging">Ordinary Kriging</option>
+                    </select>
+                </label>
+            </details>
+
+            <div class="btn-row">
+                <button id="an-run" class="btn">▶ Run analysis</button>
+                <button id="an-clear" class="btn btn-small btn-secondary">Clear</button>
+                <button id="an-csv" class="btn btn-small btn-secondary">⬇ CSV</button>
+            </div>
+            <div id="an-status" class="status"></div>
+            <div id="an-legend"></div>
+            <div id="an-results"></div>
+
+            <h3 class="method-title">Methodology</h3>
+            <p class="small">P = areal value, Pᵢ = value at station i, A = total area, n = number of stations.
+               Station values are the period totals (precipitation, ET₀, radiation, sunshine) or period means (temperature, humidity, soil moisture, wind).</p>
+
+            <details class="method">
+                <summary>1. Arithmetic Mean</summary>
+                <p class="formula">P = (P₁ + P₂ + … + Pₙ) / n</p>
+                <p>The simple average of the stations that lie <em>inside</em> the boundary. Every station has the same weight.
+                   It is fine for flat areas with evenly spaced stations and small differences between them, but is biased when stations are clustered (for example many stations on the coast).</p>
+            </details>
+
+            <details class="method">
+                <summary>2. Thiessen Polygons</summary>
+                <p class="formula">P = Σ (Aᵢ · Pᵢ) / A</p>
+                <p>Each point in the area is given to its nearest station, which divides the area into polygons (perpendicular bisectors between neighbouring stations).
+                   Each station is weighted by the area of its polygon inside the boundary, Aᵢ / A. Stations just outside the boundary also count when their polygon reaches inside.
+                   It corrects for uneven station spacing but ignores terrain, and values jump at polygon edges.</p>
+                <p class="small">Here the polygons are computed on the grid (each cell goes to its nearest station) and cell areas use the exact spherical area of each latitude/longitude cell.</p>
+            </details>
+
+            <details class="method">
+                <summary>3. Isohyetal Method</summary>
+                <p class="formula">P = Σ [Aⱼ · (Iⱼ + Iⱼ₊₁) / 2] / A</p>
+                <p>Lines of equal value (isohyets) are drawn from the station values. The area Aⱼ between two neighbouring isohyets Iⱼ and Iⱼ₊₁ is multiplied by their average, and the results are summed.
+                   It is usually the most accurate classic method because it follows the real pattern of rainfall, including the effect of mountains, if the isohyets are drawn well.</p>
+                <p class="small">Instead of drawing the lines by hand, the surface is interpolated (IDW, spline or kriging, see options) and contoured at the chosen interval. Because each band uses the midpoint of its two isohyets, a dry area in the lowest band is counted at half the interval.</p>
+            </details>
+
+            <details class="method">
+                <summary>4. Inverse Distance Weighting (IDW)</summary>
+                <p class="formula">P(x) = Σ wᵢ Pᵢ / Σ wᵢ ,  wᵢ = 1 / dᵢᵖ</p>
+                <p>The value at each grid point is a weighted average of all stations; closer stations get more weight. With p = 2 this is the classic <em>reciprocal distance squared</em> method.
+                   The areal value is the area-weighted mean of the grid inside the boundary. A larger p gives more local, "bull's-eye" patterns.</p>
+            </details>
+
+            <details class="method">
+                <summary>5. Thin-Plate Spline</summary>
+                <p class="formula">P(x) = a₀ + a₁x + a₂y + Σ wᵢ · φ(‖x − xᵢ‖),  φ(r) = r² ln r</p>
+                <p>A smooth surface that passes through every station (λ = 0) while bending as little as possible. Setting a smoothing λ &gt; 0 lets the surface miss stations slightly to reduce wiggles.
+                   It gives smooth, realistic patterns but can overshoot between stations; negative values are set to zero for variables that cannot be negative.</p>
+            </details>
+
+            <details class="method">
+                <summary>6. Ordinary Kriging</summary>
+                <p class="formula">P(x₀) = Σ λᵢ Pᵢ ,  Σ λᵢ = 1</p>
+                <p class="formula">γ(h) = c₀ + c · (1 − e^(−3h/a))</p>
+                <p>A geostatistical method. First the semivariogram γ(h) — how different two stations are as a function of their distance h — is estimated from the data and fitted with an exponential model (nugget c₀, sill c₀ + c, range a).
+                   The weights λᵢ are then chosen to give the unbiased estimate with the smallest error variance. It accounts for clustering and spatial correlation, but needs enough stations for a reliable variogram.</p>
+                <p class="small">The variogram is fitted automatically by weighted least squares on 12 distance classes; the fitted values are shown in the results.</p>
+            </details>
+
+            <details class="method">
+                <summary>Boundary mean</summary>
+                <p>All the grid methods (Thiessen, Isohyetal, IDW, Spline, Kriging) give the area-weighted mean <em>inside the selected boundary</em>:
+                   P = Σ (Aₖ · Pₖ) / Σ Aₖ over the grid cells k inside it. Choose the national boundary or draw your own catchment / region on the map.
+                   Stations outside the boundary still help the interpolation near the edge; only the Arithmetic Mean uses stations inside the boundary alone.</p>
+            </details>
+
+            <details class="method">
+                <summary>Data sources</summary>
+                <p><strong>NCM station observations</strong> — daily values measured at the National Center for Meteorology's synoptic stations.
+                   NCM shares these with the World Meteorological Organization (WMO); they are read here from NOAA NCEI's
+                   <em>Global Summary of the Day</em> archive, which is free and public. Units are converted to metric and
+                   relative humidity is calculated from the daily mean temperature and dew point.
+                   Days the station sent no precipitation report are counted as 0 mm, as NOAA does.
+                   <strong>Rainfall is the weak point of this exchange:</strong> stations often report that it rained without sending the amount.
+                   By default such stations are left out of rainfall averages (their totals would be too low); you can include them in "Method options".
+                   Temperature, humidity, dew point, wind and pressure are reported much more completely.
+                   The NOAA archive currently ends on 24 August 2025.</p>
+                <p><strong>ERA5 model data</strong> — ECMWF ERA5 reanalysis via the Open-Meteo Historical API, sampled at each station's coordinates.
+                   It has no gaps, covers 1940 to about 6 days ago, and includes variables stations do not report (ET₀, solar radiation, soil moisture),
+                   but it is a model estimate (about 25 km resolution), not a measurement.</p>
+                <p><strong>Other sources</strong> — CHIRPS and IMERG satellite rainfall (via NASA SERVIR ClimateSERV), NASA POWER, and the GFS and ECMWF forecasts
+                   (choose a future period, up to 15–16 days ahead). Satellite sources give the value of the grid cell at each station, so the methods
+                   above work the same way. The "📚 All data sources" button in the sidebar lists every source and how it is used.</p>
+                <p>NCM's official, quality-controlled archive (including climatological and rain-gauge stations) is available on request through NCM's
+                   <a href="https://www.ncm.gov.sa/en/services/our-services/meteorological-data-publishing-or-utilization-service" target="_blank" rel="noopener">Meteorological Data Publishing or Utilization service</a>; NCM asks for prior approval before its data is republished.</p>
+            </details>
+        </div>
+    </div>
+
+    <!-- ============ Station time series window ============ -->
+    <div id="ts-modal" class="modal hidden">
+        <div class="modal-box">
+            <div class="panel-header">
+                <div>
+                    <h2 id="ts-title">Station</h2>
+                    <div id="ts-meta" class="small"></div>
+                </div>
+                <button id="ts-close" class="icon-btn" title="Close">✕</button>
+            </div>
+            <div class="panel-body">
+                <label class="field">Station <select id="ts-station"></select></label>
+                <div class="form-grid">
+                    <label>From <input type="date" id="ts-from"></label>
+                    <label>Until <input type="date" id="ts-until"></label>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-small btn-secondary" data-quick="365" data-mode="ncm">Latest NCM year</button>
+                    <button class="btn btn-small btn-secondary" data-quick="30">Last 30 days</button>
+                    <button class="btn btn-small btn-secondary" data-quick="365">Last year</button>
+                    <button class="btn btn-small btn-secondary" data-quick="3652">Last 10 years</button>
+                    <button class="btn btn-small btn-secondary" data-quick="16" data-mode="forecast">Next 16 days (forecast)</button>
+                    <button id="ts-load" class="btn btn-small">Load period</button>
+                </div>
+                <div class="field">Data sources (tick to compare)
+                    <div id="ts-sources" class="src-grid"></div>
+                </div>
+                <div id="ts-status" class="status"></div>
+
+                <div class="form-grid">
+                    <label>Chart <select id="ts-variable"></select></label>
+                    <label>Group by
+                        <select id="ts-group">
+                            <option value="daily">Daily</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="chart-wrap"><canvas id="ts-chart"></canvas></div>
+                <div id="ts-summary"></div>
+                <div class="btn-row">
+                    <button id="ts-csv" class="btn btn-small">⬇ Download daily CSV</button>
+                </div>
+
+                <h3 class="method-title">Outlook &amp; long-term climate</h3>
+                <div class="btn-row">
+                    <button class="btn btn-small btn-secondary" data-outlook="seasonal">🌦 ECMWF seasonal outlook (6 months)</button>
+                    <button class="btn btn-small btn-secondary" data-outlook="cmip6">🌡 CMIP6 climate projection (to 2050)</button>
+                    <button class="btn btn-small btn-secondary" data-outlook="solar">☀️ Global Solar Atlas</button>
+                    <button id="ts-windrose" class="btn btn-small btn-secondary">🧭 Wind rose (loaded period)</button>
+                </div>
+                <div id="ts-outlook"></div>
+
+                <p class="small source">Hover a source name to see where its data comes from. The "📚 All data sources" button in the sidebar lists every source and how it is used.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Data source catalog ============ -->
+    <div id="catalog-modal" class="modal hidden">
+        <div class="modal-box wide">
+            <div class="panel-header">
+                <h2>Data sources</h2>
+                <button id="catalog-close" class="icon-btn" title="Close">✕</button>
+            </div>
+            <div class="panel-body" id="catalog-body"></div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p>Loading weather data...</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-array@3.2.4/dist/d3-array.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-contour@4.0.2/dist/d3-contour.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="stations.js"></script>
+    <script src="legend.js"></script>
+    <script src="app.js"></script>
+    <script src="timeseries.js"></script>
+    <script src="ncm.js"></script>
+    <script src="sources.js"></script>
+    <script src="analysis.js"></script>
+    <script src="layers.js"></script>
+    <script src="wind.js"></script>
+    <script src="gee.js"></script>
+    <script src="catalog.js"></script>
+</body>
+</html>
