@@ -485,8 +485,9 @@
     }
 
     function renderTables(run) {
-        const { results, v, method, G, from, until } = run;
+        const { results, v, method, G, from, until, source, excluded, flagged, minCoverage, pts } = run;
         const fmt = x => (x === null || x === undefined || Number.isNaN(x)) ? 'N/A' : x.toFixed(2);
+        const srcName = source === 'ncm' ? 'NCM station observations' : 'ERA5 model data';
 
         const rows = Object.entries(METHODS).map(([k, name]) => `
             <tr class="${k === method ? 'selected' : ''}" data-method="${k}">
@@ -494,8 +495,12 @@
                 <td class="num"><strong>${fmt(results[k]?.value)}</strong></td>
                 <td class="small">${results[k]?.note || ''}</td>
             </tr>`).join('');
-        let html = `<p class="small">${v.label} (${v.agg === 'sum' ? 'period total' : 'period mean'}), ${from} → ${until}.
-                    Area: ${Math.round(G.totalArea).toLocaleString()} km².</p>
+        let html = `<p class="small">${v.label} (${v.agg === 'sum' ? 'period total' : 'period mean'}), ${from} → ${until}, from <strong>${srcName}</strong>.
+                    Area: ${Math.round(G.totalArea).toLocaleString()} km². ${pts.length} stations used
+                    (each with at least ${Math.round(minCoverage * 100)}% of days reported).</p>
+            ${excluded.length ? `<p class="small">Not used: ${excluded.join(', ')}.</p>` : ''}
+            ${flagged.length ? `<p class="small">* ${flagged.join(', ')}: rain was observed on some days with no amount reported, so these totals are too low.</p>` : ''}
+            ${source === 'ncm' && v.agg === 'sum' ? `<p class="small">Totals add up the days each station reported; missing days are not filled in.</p>` : ''}
             <table class="data-table">
               <thead><tr><th>Method</th><th>Areal value (${v.unit})</th><th>Details</th></tr></thead>
               <tbody>${rows}</tbody></table>`;
@@ -550,24 +555,49 @@
 
         const key = $('an-variable').value;
         const v = VARS[key];
-        setStatus('Downloading station data for the period…');
+        const source = $('an-source').value;
+        if ((source === 'ncm' && v.src === 'era5') || (source === 'era5' && v.src === 'ncm')) {
+            return setStatus(`${v.label} is not available from ${source === 'ncm' ? 'NCM observations' : 'ERA5'} — choose the other data source.`, true);
+        }
+        const minCoverage = Math.min(100, Math.max(0, Number($('an-coverage').value) || 0)) / 100;
+
+        setStatus(source === 'ncm' ? 'Downloading NCM station observations (NOAA archive)…' : 'Downloading ERA5 data for the period…');
         let data;
         try {
-            data = await window.fetchArchive(SAUDI_WEATHER_STATIONS, from, until);
+            data = await window.fetchSource(source, SAUDI_WEATHER_STATIONS, from, until);
         } catch (e) {
             return setStatus('Could not load data: ' + e.message, true);
         }
 
-        const pts = [];
+        const pts = [], excluded = [], flagged = [];
         SAUDI_WEATHER_STATIONS.forEach((s, i) => {
-            const val = window.summarizeSeries(data[i]?.daily[key] || [], v.agg).value;
-            if (val === null) return;
+            const d = data[i];
+            if (!d?.available) { if (source === 'ncm') excluded.push(`${s.city} (no NCM observations)`); return; }
+            const series = d.daily[key] || [];
+            const sm = window.summarizeSeries(series, v.agg);
+            const coverage = series.length ? sm.n / series.length : 0;
+            if (sm.value === null || coverage < minCoverage) {
+                excluded.push(`${s.city} (${Math.round(coverage * 100)}% of days)`);
+                return;
+            }
+            let label = s.city;
+            if (key === 'precipitation_sum' && d.rainNoAmount > 0) {
+                if ($('an-rainmissing').value === 'exclude') {
+                    excluded.push(`${s.city} (rain on ${d.rainNoAmount} day(s) with no amount)`);
+                    return;
+                }
+                label = s.city + '*';
+                flagged.push(s.city);
+            }
             const [x, y] = toXY(s.lon, s.lat);
             // Skip duplicate locations (they make the interpolation matrices singular)
-            if (pts.some(p => Math.hypot(p.x - x, p.y - y) < 1)) return;
-            pts.push({ id: s.id, name: s.city, lat: s.lat, lon: s.lon, x, y, v: val, inside: pointInGeom(s.lon, s.lat, g) });
+            if (pts.some(p => Math.hypot(p.x - x, p.y - y) < 1)) { excluded.push(`${s.city} (same location as another station)`); return; }
+            pts.push({ id: s.id, name: label, lat: s.lat, lon: s.lon, x, y, v: sm.value, coverage, inside: pointInGeom(s.lon, s.lat, g) });
         });
-        if (pts.length < 3) return setStatus('At least 3 stations with data are needed.', true);
+        if (pts.length < 3) {
+            return setStatus(`At least 3 stations with enough data are needed (found ${pts.length}).`
+                + (source === 'ncm' ? ' NCM observations in the NOAA archive currently end on ' + window.NCM_DATA_END + '.' : ''), true);
+        }
 
         setStatus('Interpolating…');
         await new Promise(r => setTimeout(r, 30));   // let the status repaint
@@ -590,7 +620,7 @@
             return setStatus('Calculation failed: ' + e.message, true);
         }
 
-        lastRun = { G, pts, results, v, key, from, until, method: $('an-method').value };
+        lastRun = { G, pts, results, v, key, from, until, source, excluded, flagged, minCoverage, method: $('an-method').value };
         render(lastRun);
         renderTables(lastRun);
         setStatus(`Done in ${((performance.now() - t0) / 1000).toFixed(1)} s · ${pts.length} stations · grid ${G.nx}×${G.ny} cells.`);
@@ -599,7 +629,8 @@
     function downloadCsv() {
         if (!lastRun) return;
         const { pts, results, v, from, until } = lastRun;
-        const lines = [`# ${v.label} (${v.unit}), ${from} to ${until}`, 'method,areal_value,details'];
+        const srcNote = lastRun.source === 'ncm' ? window.NCM_SOURCE_NOTE : 'ECMWF ERA5 reanalysis via Open-Meteo';
+        const lines = [`# ${v.label} (${v.unit}), ${from} to ${until}; source: ${srcNote}`, 'method,areal_value,details'];
         Object.entries(METHODS).forEach(([k, name]) =>
             lines.push(`${name},${results[k]?.value ?? ''},"${(results[k]?.note || '').replace(/"/g, "'")}"`));
         lines.push('', 'station,lat,lon,inside_boundary,value,thiessen_area_km2,thiessen_weight');
@@ -649,11 +680,12 @@
 
     // ---------------- UI wiring ----------------
     function init() {
-        const until = DU.archiveMaxDate();
+        // Default to the latest 12 months that have NCM observations
+        const until = window.NCM_DATA_END < DU.archiveMaxDate() ? window.NCM_DATA_END : DU.archiveMaxDate();
         $('an-from').value = DU.shiftDate(until, -364);
         $('an-until').value = until;
         $('an-from').min = $('an-until').min = DU.ARCHIVE_MIN;
-        $('an-from').max = $('an-until').max = until;
+        $('an-from').max = $('an-until').max = DU.archiveMaxDate();
 
         $('an-variable').innerHTML = Object.entries(VARS)
             .map(([k, v]) => `<option value="${k}">${v.label} (${v.unit})</option>`).join('');

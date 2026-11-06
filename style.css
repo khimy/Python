@@ -378,7 +378,8 @@ input[type="date"], input[type="number"], select {
 .popup-btn { margin-top: 8px; }
 
 .status { font-size: 12px; color: #34e89e; min-height: 16px; margin: 4px 0; }
-.status.error { color: #ff6b6b; }
+.status.error, .status .err { color: #ff6b6b; }
+.panel-body a { color: #34e89e; }
 .small { font-size: 12px; color: #aaa; }
 .source { margin-top: 12px; font-style: italic; }
 

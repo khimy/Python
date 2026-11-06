@@ -131,6 +131,13 @@
                 <label>Until <input type="date" id="an-until"></label>
             </div>
 
+            <label class="field">Data source
+                <select id="an-source">
+                    <option value="ncm">NCM station observations (measured)</option>
+                    <option value="era5">ERA5 model data (complete, all variables)</option>
+                </select>
+            </label>
+
             <label class="field">Variable <select id="an-variable"></select></label>
 
             <label class="field">Boundary
@@ -153,6 +160,13 @@
                         <option value="0.25">0.25° (~28 km, fast)</option>
                         <option value="0.1" selected>0.1° (~11 km)</option>
                         <option value="0.05">0.05° (~5.5 km, slow)</option>
+                    </select>
+                </label>
+                <label class="field">Minimum days reported per station (%) <input type="number" id="an-coverage" value="80" min="0" max="100" step="5"></label>
+                <label class="field">NCM rainfall: stations with rain days missing an amount
+                    <select id="an-rainmissing">
+                        <option value="exclude">Leave them out (recommended)</option>
+                        <option value="include">Use them anyway (their totals are too low)</option>
                     </select>
                 </label>
                 <label class="field">IDW power (p) <input type="number" id="an-power" value="2" min="0.5" max="6" step="0.5"></label>
@@ -234,7 +248,23 @@
                    Stations outside the boundary still help the interpolation near the edge; only the Arithmetic Mean uses stations inside the boundary alone.</p>
             </details>
 
-            <p class="small source">Data: ERA5 reanalysis (Copernicus/ECMWF) via the Open-Meteo Historical API, sampled at each station's coordinates. These are model values at the station locations, not the stations' own gauge records.</p>
+            <details class="method">
+                <summary>Data sources</summary>
+                <p><strong>NCM station observations</strong> — daily values measured at the National Center for Meteorology's synoptic stations.
+                   NCM shares these with the World Meteorological Organization (WMO); they are read here from NOAA NCEI's
+                   <em>Global Summary of the Day</em> archive, which is free and public. Units are converted to metric and
+                   relative humidity is calculated from the daily mean temperature and dew point.
+                   Days the station sent no precipitation report are counted as 0 mm, as NOAA does.
+                   <strong>Rainfall is the weak point of this exchange:</strong> stations often report that it rained without sending the amount.
+                   By default such stations are left out of rainfall averages (their totals would be too low); you can include them in "Method options".
+                   Temperature, humidity, dew point, wind and pressure are reported much more completely.
+                   The NOAA archive currently ends on 24 August 2025.</p>
+                <p><strong>ERA5 model data</strong> — ECMWF ERA5 reanalysis via the Open-Meteo Historical API, sampled at each station's coordinates.
+                   It has no gaps, covers 1940 to about 6 days ago, and includes variables stations do not report (ET₀, solar radiation, soil moisture),
+                   but it is a model estimate (about 25 km resolution), not a measurement.</p>
+                <p>NCM's official, quality-controlled archive (including climatological and rain-gauge stations) is available on request through NCM's
+                   <a href="https://www.ncm.gov.sa/en/services/our-services/meteorological-data-publishing-or-utilization-service" target="_blank" rel="noopener">Meteorological Data Publishing or Utilization service</a>; NCM asks for prior approval before its data is republished.</p>
+            </details>
         </div>
     </div>
 
@@ -255,6 +285,7 @@
                     <label>Until <input type="date" id="ts-until"></label>
                 </div>
                 <div class="btn-row">
+                    <button class="btn btn-small btn-secondary" data-quick="365" data-ncm="1">Latest NCM year</button>
                     <button class="btn btn-small btn-secondary" data-quick="30">Last 30 days</button>
                     <button class="btn btn-small btn-secondary" data-quick="365">Last year</button>
                     <button class="btn btn-small btn-secondary" data-quick="3652">Last 10 years</button>
@@ -264,6 +295,13 @@
 
                 <div class="form-grid">
                     <label>Chart <select id="ts-variable"></select></label>
+                    <label>Show
+                        <select id="ts-show">
+                            <option value="both">NCM observed + ERA5 model</option>
+                            <option value="ncm">NCM observed only</option>
+                            <option value="era5">ERA5 model only</option>
+                        </select>
+                    </label>
                     <label>Group by
                         <select id="ts-group">
                             <option value="daily">Daily</option>
@@ -277,7 +315,8 @@
                 <div class="btn-row">
                     <button id="ts-csv" class="btn btn-small">⬇ Download daily CSV</button>
                 </div>
-                <p class="small source">Daily ERA5 reanalysis values at the station location (Open-Meteo Historical API). Available from 1940 to about 6 days ago.</p>
+                <p class="small source">NCM observed: the station's daily observations exchanged through the WMO (NOAA NCEI Global Summary of the Day; currently until 24 Aug 2025).
+                   ERA5 model: reanalysis at the station location (Open-Meteo Historical API; 1940 to about 6 days ago).</p>
             </div>
         </div>
     </div>
@@ -295,6 +334,7 @@
     <script src="stations.js"></script>
     <script src="app.js"></script>
     <script src="timeseries.js"></script>
+    <script src="ncm.js"></script>
     <script src="analysis.js"></script>
 </body>
 </html>

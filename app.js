@@ -121,6 +121,7 @@
         html += `<div class="popup-row"><span class="popup-label">Type:</span><span class="popup-value">${station.type}</span></div>`;
         html += `<div class="popup-row"><span class="popup-label">Elevation:</span><span class="popup-value">${station.elevation} m</span></div>`;
         html += `<div class="popup-row"><span class="popup-label">Lat / Lon:</span><span class="popup-value">${station.lat.toFixed(4)}, ${station.lon.toFixed(4)}</span></div>`;
+        html += `<div class="popup-row"><span class="popup-label">NCM observations:</span><span class="popup-value">${station.gsod ? 'Yes (NOAA GSOD ' + station.gsod + ')' : 'Not available'}</span></div>`;
         html += `<button class="btn btn-small popup-btn" onclick="openTimeSeries('${station.id}')">📈 Time series — choose From / Until</button>`;
 
         if (weather) {
