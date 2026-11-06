@@ -7,6 +7,19 @@ areal-averaging methods (Arithmetic Mean, Thiessen, Isohyetal, IDW, Spline, Krig
 It is a static website: everything runs in the browser and needs an internet connection for
 the data. The only thing to run locally is a tiny web server.
 
+## Online version (GitHub Pages)
+
+The site is plain HTML/JS, so GitHub Pages can host it for free:
+
+1. On GitHub open **khimy/Python → Settings → Pages**.
+2. Under **Build and deployment** choose **Source: Deploy from a branch**.
+3. Choose the branch **`claude/weather-data-map-Lnifi`** (or `master` once merged), folder **`/ (root)`**, and **Save**.
+4. After a minute the site is live at **https://khimy.github.io/Python/**.
+
+GitHub Pages is free for public repositories; a private repository needs a paid GitHub plan.
+Because the address is https, it can also be used as the Earth Engine OAuth origin
+(`https://khimy.github.io`).
+
 ## Open it at http://swema/
 
 ### 1. One-time setup: add the local domain `swema`
