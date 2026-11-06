@@ -10,9 +10,11 @@
     'use strict';
 
     // Daily variables.
-    // agg:    how daily values combine over a period ('sum' = total, 'mean' = average)
+    // agg:    how daily values combine over a period ('sum' = total, 'mean' = average,
+    //         'circ' = circular mean for directions)
     // nonneg: value can never be negative (used to clamp interpolation)
-    // src:    'both' | 'era5' (model only) | 'ncm' (observed only)
+    // src:    'both' (NCM + ERA5) | 'era5' (ERA5, not NCM) | 'ncm' (NCM only) | 'cams' (atmospheric composition)
+    // noAreal: not meaningful to interpolate over an area (directions)
     const PERIOD_VARS = {
         precipitation_sum:           { label: 'Precipitation',                      unit: 'mm',    agg: 'sum',  nonneg: true, ramp: 'blues', src: 'both' },
         temperature_2m_mean:         { label: 'Mean Temperature',                   unit: '°C',    agg: 'mean', ramp: 'temp',  src: 'both' },
@@ -23,6 +25,7 @@
         wind_speed_10m_mean:         { label: 'Mean Wind Speed',                    unit: 'km/h',  agg: 'mean', nonneg: true, ramp: 'blues', src: 'both' },
         wind_speed_10m_max:          { label: 'Max Wind Speed',                     unit: 'km/h',  agg: 'mean', nonneg: true, ramp: 'blues', src: 'both' },
         wind_gusts_10m_max:          { label: 'Max Wind Gust',                      unit: 'km/h',  agg: 'mean', nonneg: true, ramp: 'blues', src: 'both' },
+        wind_direction_10m_dominant: { label: 'Dominant Wind Direction',            unit: '° from', agg: 'circ', ramp: 'blues', src: 'era5', noAreal: true },
         pressure_msl_mean:           { label: 'Sea-Level Pressure',                 unit: 'hPa',   agg: 'mean', ramp: 'temp',  src: 'both' },
         et0_fao_evapotranspiration:  { label: 'Potential Evapotranspiration (ET₀)', unit: 'mm',    agg: 'sum',  nonneg: true, ramp: 'reds',  src: 'era5' },
         shortwave_radiation_sum:     { label: 'Solar Radiation',                    unit: 'MJ/m²', agg: 'sum',  nonneg: true, ramp: 'solar', src: 'era5' },
@@ -31,6 +34,17 @@
         visibility_mean:             { label: 'Visibility',                         unit: 'km',    agg: 'mean', nonneg: true, ramp: 'blues', src: 'ncm' },
         fog_days:                    { label: 'Days with Fog',                      unit: 'days',  agg: 'sum',  nonneg: true, ramp: 'blues', src: 'ncm' },
         thunder_days:                { label: 'Days with Thunder',                  unit: 'days',  agg: 'sum',  nonneg: true, ramp: 'blues', src: 'ncm' },
+        // Atmospheric composition (Copernicus CAMS, daily means of hourly values)
+        nitrogen_dioxide:            { label: 'Nitrogen Dioxide (NO₂)',             unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        sulphur_dioxide:             { label: 'Sulphur Dioxide (SO₂)',              unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        formaldehyde:                { label: 'Formaldehyde (HCHO)',                unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        carbon_dioxide:              { label: 'Carbon Dioxide (CO₂)',               unit: 'ppm',   agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        methane:                     { label: 'Methane (CH₄)',                      unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        ozone:                       { label: 'Ozone (O₃)',                         unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        carbon_monoxide:             { label: 'Carbon Monoxide (CO)',               unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        dust:                        { label: 'Dust',                               unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'solar', src: 'cams' },
+        pm2_5:                       { label: 'PM2.5',                              unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
+        pm10:                        { label: 'PM10',                               unit: 'µg/m³', agg: 'mean', nonneg: true, ramp: 'reds',  src: 'cams' },
     };
     window.PERIOD_VARS = PERIOD_VARS;
 
@@ -65,7 +79,7 @@
         const key = stations.map(s => s.id).join(',') + '|' + start + '|' + end;
         if (archiveCache.has(key)) return archiveCache.get(key);
 
-        const modelKeys = Object.keys(PERIOD_VARS).filter(k => PERIOD_VARS[k].src !== 'ncm');
+        const modelKeys = Object.keys(PERIOD_VARS).filter(k => ['both', 'era5'].includes(PERIOD_VARS[k].src));
         const params = new URLSearchParams({
             latitude: stations.map(s => s.lat).join(','),
             longitude: stations.map(s => s.lon).join(','),
@@ -105,6 +119,17 @@
 
 
     function summarize(values, agg) {
+        if (agg === 'circ') {
+            // Circular mean of directions (degrees); min / max are not meaningful
+            let n = 0, sx = 0, sy = 0;
+            for (const v of values) {
+                if (v === null || Number.isNaN(v)) continue;
+                n++; sx += Math.sin(v * Math.PI / 180); sy += Math.cos(v * Math.PI / 180);
+            }
+            if (!n) return { value: null, min: null, max: null, n: 0, missing: values.length };
+            const deg = (Math.atan2(sx, sy) * 180 / Math.PI + 360) % 360;
+            return { value: deg, min: null, max: null, n, missing: values.length - n };
+        }
         let n = 0, sum = 0, min = Infinity, max = -Infinity;
         for (const v of values) {
             if (v === null || Number.isNaN(v)) continue;
@@ -348,6 +373,72 @@
         loadSeries();
     }
 
+    // ---------- Wind rose ----------
+    // Frequency of daily dominant wind directions (16 sectors), split by daily mean wind speed
+    function windRose() {
+        const order = ['era5', 'power', 'gfs', 'ecmwf'];
+        const k = order.find(k => current?.series[k] &&
+            current.series[k].daily.wind_direction_10m_dominant.some(v => v !== null));
+        if (!k) {
+            $('ts-outlook').innerHTML = '<p class="status error">Tick ERA5, NASA POWER, GFS or ECMWF and load a period first (NCM daily data has no wind direction).</p>';
+            return;
+        }
+        const d = current.series[k].daily;
+        const classes = [[0, 10, '#c6dbef'], [10, 20, '#6baed6'], [20, 30, '#2171b5'], [30, Infinity, '#08306b']];
+        const counts = Array.from({ length: 16 }, () => [0, 0, 0, 0]);
+        let n = 0;
+        d.wind_direction_10m_dominant.forEach((dir, i) => {
+            const sp = d.wind_speed_10m_mean[i];
+            if (dir === null || sp === null) return;
+            const sec = Math.round(dir / 22.5) % 16;
+            const c = classes.findIndex(([a, b]) => sp >= a && sp < b);
+            counts[sec][c]++; n++;
+        });
+        const pct = counts.map(r => r.map(c => c / n * 100));
+        const maxTotal = Math.max(...pct.map(r => r.reduce((a, b) => a + b, 0)));
+        const ringStep = maxTotal > 30 ? 10 : maxTotal > 12 ? 5 : 2;
+        const outer = Math.ceil(maxTotal / ringStep) * ringStep || ringStep;
+        const R = 150, cx = 190, cy = 180, scale = r => r / outer * R;
+        const pt = (r, a) => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+        const rad = deg => deg * Math.PI / 180;
+
+        let paths = '';
+        pct.forEach((row, sec) => {
+            let r0 = 0;
+            const a0 = rad(sec * 22.5 - 9), a1 = rad(sec * 22.5 + 9);
+            row.forEach((p, c) => {
+                if (p <= 0) return;
+                const ri = scale(r0), ro = scale(r0 + p);
+                const [x1, y1] = pt(ri, a0), [x2, y2] = pt(ro, a0), [x3, y3] = pt(ro, a1), [x4, y4] = pt(ri, a1);
+                paths += `<path d="M${x1},${y1} L${x2},${y2} A${ro},${ro} 0 0 1 ${x3},${y3} L${x4},${y4} A${ri},${ri} 0 0 0 ${x1},${y1} Z" fill="${classes[c][2]}" stroke="#1a1a2e" stroke-width="0.5"><title>${['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][sec]}: ${p.toFixed(1)}% of days at ${classes[c][0]}–${classes[c][1] === Infinity ? '' : classes[c][1]} km/h</title></path>`;
+                r0 += p;
+            });
+        });
+        let rings = '';
+        for (let r = ringStep; r <= outer; r += ringStep) {
+            rings += `<circle cx="${cx}" cy="${cy}" r="${scale(r)}" fill="none" stroke="#2a2a4a"/>
+                      <text x="${cx + 3}" y="${cy - scale(r) + 11}" fill="#888" font-size="10">${r}%</text>`;
+        }
+        const labels = [['N', 0], ['E', 90], ['S', 180], ['W', 270]].map(([t, a]) => {
+            const [x, y] = pt(R + 16, rad(a));
+            return `<text x="${x}" y="${y + 4}" fill="#ddd" font-size="13" font-weight="700" text-anchor="middle">${t}</text>`;
+        }).join('');
+        const legend = classes.map(([a, b, col], i) => `<rect x="395" y="${60 + i * 22}" width="14" height="14" fill="${col}"/>
+            <text x="415" y="${72 + i * 22}" fill="#ddd" font-size="12">${b === Infinity ? `> ${a}` : `${a}–${b}`} km/h</text>`).join('');
+        const mean = summarize(d.wind_direction_10m_dominant, 'circ').value;
+
+        $('ts-outlook').innerHTML = `<h3 class="method-title">Wind rose — ${window.DATA_SOURCES[k].name}</h3>
+            <svg viewBox="0 0 520 360" class="windrose" role="img" aria-label="Wind rose">
+                ${rings}<line x1="${cx}" y1="${cy - R}" x2="${cx}" y2="${cy + R}" stroke="#2a2a4a"/>
+                <line x1="${cx - R}" y1="${cy}" x2="${cx + R}" y2="${cy}" stroke="#2a2a4a"/>
+                ${paths}${labels}
+                <text x="395" y="45" fill="#34e89e" font-size="12" font-weight="700">Daily mean speed</text>${legend}
+            </svg>
+            <p class="small">${n} days (${current.series[k].time[0]} → ${current.series[k].time.at(-1)}). Each bar shows how often the day's dominant wind
+               came <em>from</em> that direction; colours split it by the day's mean wind speed. Average direction: ${mean === null ? '—' : Math.round(mean) + '°'}.
+               Built from daily values; an hourly wind rose would show more detail.</p>`;
+    }
+
     // ---------- Outlook products ----------
     function showOutlook(title, note, tableHtml, chartConfig) {
         $('ts-outlook').innerHTML = `<h3 class="method-title">${title}</h3>
@@ -439,6 +530,7 @@
     // Set up after all scripts (including sources.js) have loaded
     document.addEventListener('DOMContentLoaded', () => {
     populateSelects();
+    $('ts-windrose').addEventListener('click', windRose);
     $('ts-close').addEventListener('click', () => $('ts-modal').classList.add('hidden'));
     $('ts-modal').addEventListener('click', e => { if (e.target.id === 'ts-modal') $('ts-modal').classList.add('hidden'); });
     $('ts-load').addEventListener('click', loadSeries);

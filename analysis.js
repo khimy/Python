@@ -709,7 +709,8 @@
             }
         });
 
-        $('an-variable').innerHTML = Object.entries(VARS)
+        // Directions cannot be interpolated as plain numbers, so they are left out here
+        $('an-variable').innerHTML = Object.entries(VARS).filter(([, v]) => !v.noAreal)
             .map(([k, v]) => `<option value="${k}">${v.label} (${v.unit})</option>`).join('');
         $('an-method').innerHTML = Object.entries(METHODS)
             .map(([k, n]) => `<option value="${k}">${n}</option>`).join('');

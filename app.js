@@ -39,7 +39,7 @@
     baseMaps.osm.addTo(map);
 
     // Shared with timeseries.js and analysis.js
-    window.WX = { map };
+    window.WX = { map };   // more fields (layers, legends, live data) are added below
 
     // --- Base map radio buttons ---
     document.querySelectorAll('input[name="basemap"]').forEach(radio => {
@@ -90,6 +90,8 @@
 
     // --- Weather data cache ---
     let weatherDataCache = {};
+    window.WX.overlayLayers = overlayLayers;
+    window.WX.getWeather = id => weatherDataCache[id];
 
     // --- Create station icon ---
     function createStationIcon(temp) {
@@ -163,6 +165,9 @@
             html += row('NO₂', fmt(weather.no2, ' µg/m³'));
             html += row('SO₂', fmt(weather.so2, ' µg/m³'));
             html += row('CO', fmt(weather.co, ' µg/m³'));
+            html += row('Formaldehyde (HCHO)', fmt(weather.hcho, ' µg/m³'));
+            html += row('Carbon Dioxide (CO₂)', fmt(weather.co2, ' ppm'));
+            html += row('Methane (CH₄)', fmt(weather.ch4, ' µg/m³'));
             html += row('Visibility', weather.visibility != null ? (weather.visibility / 1000).toFixed(1) + ' km' : 'N/A');
             html += row('Vapour Pressure Deficit', fmt(weather.vpd, ' kPa'));
             html += row('Wind Gusts', fmt(weather.wind_gusts, ' km/h'));
@@ -309,7 +314,8 @@
             longitude: station.lon,
             current: [
                 'dust', 'pm10', 'pm2_5', 'aerosol_optical_depth', 'uv_index',
-                'ozone', 'nitrogen_dioxide', 'sulphur_dioxide', 'carbon_monoxide'
+                'ozone', 'nitrogen_dioxide', 'sulphur_dioxide', 'carbon_monoxide',
+                'formaldehyde', 'carbon_dioxide', 'methane'
             ].join(','),
             timezone: 'Asia/Riyadh'
         });
@@ -328,6 +334,9 @@
                 no2: c.nitrogen_dioxide ?? null,
                 so2: c.sulphur_dioxide ?? null,
                 co: c.carbon_monoxide ?? null,
+                hcho: c.formaldehyde ?? null,
+                co2: c.carbon_dioxide ?? null,
+                ch4: c.methane ?? null,
             };
         } catch (err) {
             console.error(`Failed to fetch air quality for ${station.name}:`, err);
@@ -414,6 +423,9 @@
             no2: { key: 'no2', unit: 'µg/m³', colors: ['#fcfbfd', '#9e9ac8', '#3f007d'] },
             so2: { key: 'so2', unit: 'µg/m³', colors: ['#ffffe5', '#78c679', '#004529'] },
             co: { key: 'co', unit: 'µg/m³', colors: ['#f7f7f7', '#969696', '#252525'] },
+            hcho: { key: 'hcho', unit: 'µg/m³', colors: ['#fff7f3', '#f768a1', '#49006a'] },
+            co2: { key: 'co2', unit: 'ppm', colors: ['#ffffcc', '#fd8d3c', '#800026'] },
+            ch4: { key: 'ch4', unit: 'µg/m³', colors: ['#f7fcf5', '#41ab5d', '#00441b'] },
             visibility: { key: 'visibility', unit: 'm', colors: ['#67000d', '#fcbba1', '#f7fbff'] },
             vpd: { key: 'vpd', unit: 'kPa', colors: ['#f7fcf0', '#7bccc4', '#084081'] },
             gusts: { key: 'wind_gusts', unit: 'km/h', colors: ['#f7fbff', '#6baed6', '#08306b'] },
@@ -471,6 +483,9 @@
             no2: [0, 100],
             so2: [0, 100],
             co: [0, 1000],
+            hcho: [0, 10],
+            co2: [410, 470],
+            ch4: [1300, 1900],
             visibility: [0, 24000],
             vpd: [0, 8],
             wind_gusts: [0, 100],
@@ -527,7 +542,7 @@
     });
 
     // --- Legend management ---
-    const legendConfigs = {
+    const legendConfigs = window.WX.legendConfigs = {
         dem: {
             title: 'DEM Elevation',
             gradient: 'linear-gradient(to right, #006400, #90EE90, #FFFF00, #8B4513, #FFFFFF)',
@@ -577,6 +592,10 @@
         no2: { title: 'Nitrogen Dioxide (NO₂)', gradient: 'linear-gradient(to right, #fcfbfd, #9e9ac8, #3f007d)', labels: ['0', '50', '100+ µg/m³'] },
         so2: { title: 'Sulphur Dioxide (SO₂)', gradient: 'linear-gradient(to right, #ffffe5, #78c679, #004529)', labels: ['0', '50', '100+ µg/m³'] },
         co: { title: 'Carbon Monoxide (CO)', gradient: 'linear-gradient(to right, #f7f7f7, #969696, #252525)', labels: ['0', '500', '1000+ µg/m³'] },
+        hcho: { title: 'Formaldehyde (HCHO)', gradient: 'linear-gradient(to right, #fff7f3, #f768a1, #49006a)', labels: ['0', '5', '10+ µg/m³'] },
+        co2: { title: 'Carbon Dioxide (CO₂)', gradient: 'linear-gradient(to right, #ffffcc, #fd8d3c, #800026)', labels: ['410', '440', '470+ ppm'] },
+        ch4: { title: 'Methane (CH₄)', gradient: 'linear-gradient(to right, #f7fcf5, #41ab5d, #00441b)', labels: ['1300', '1600', '1900+ µg/m³'] },
+        wind: { title: 'Wind speed & direction', gradient: 'linear-gradient(to right, #c6dbef, #6baed6, #2171b5, #08306b)', labels: ['0', '15', '30', '45+ km/h'] },
         visibility: { title: 'Visibility', gradient: 'linear-gradient(to right, #67000d, #fcbba1, #f7fbff)', labels: ['0 km', '12 km', '24+ km'] },
         vpd: { title: 'Vapour Pressure Deficit', gradient: 'linear-gradient(to right, #f7fcf0, #7bccc4, #084081)', labels: ['0', '4', '8+ kPa'] },
         gusts: { title: 'Wind Gusts', gradient: 'linear-gradient(to right, #f7fbff, #6baed6, #08306b)', labels: ['0', '50', '100+ km/h'] },

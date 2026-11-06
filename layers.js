@@ -25,7 +25,7 @@
                    legend: 'NASA SMAP Level-4 root-zone (0–100 cm) soil moisture (m³/m³), daily, ~9 km. Brown = dry, green/blue = wet.' },
         gldas:   { group: 'NASA EOSDIS (GIBS)', label: 'GLDAS soil moisture (monthly)', gibs: 'GLDAS_Underground_Soil_Moisture_Monthly', level: 6, period: 'month', lag: 150,
                    legend: 'NASA GLDAS Noah land model soil moisture, 0–10 cm (kg/m²), monthly. Brown = dry, blue = wet.' },
-        merra2:  { group: 'NASA EOSDIS (GIBS)', label: 'MERRA-2 precipitation (monthly)', gibs: 'MERRA2_Precipitation_Bias_Corrected_Monthly', level: 6, period: 'month', lag: 90,
+        merra2:  { group: 'NASA EOSDIS (GIBS)', label: 'MERRA-2 precipitation (monthly)', gibs: 'MERRA2_Precipitation_Bias_Corrected_Monthly', level: 6, period: 'month', lag: 100,
                    legend: 'NASA MERRA-2 bias-corrected total precipitation, monthly mean rate. Darker blue = wetter.' },
         lst:     { group: 'NASA EOSDIS (GIBS)', label: 'MODIS land surface temperature (day)', gibs: 'MODIS_Terra_Land_Surface_Temp_Day', level: 7, period: 'day', lag: 2,
                    legend: 'MODIS Terra daytime land surface temperature (~1 km). Blue = cool, through yellow to red = hot (above ~50 °C in summer). Gaps = clouds.' },
@@ -38,6 +38,21 @@
         gfw:     { group: 'Global Forest Watch', label: 'Tree cover loss (2001 – latest year)',
                    url: 'https://tiles.globalforestwatch.org/umd_tree_cover_loss/latest/dynamic/{z}/{x}/{y}.png', maxNative: 12, opacity: 1,
                    legend: 'Hansen / UMD Global Forest Change: pink-red pixels lost tree cover from 2001 to the latest yearly update. In Saudi Arabia tree cover is limited to the south-west mountains (Asir, Al Baha).' },
+        // ---- Atmospheric gases (shown in the "Atmospheric Gases" sidebar section) ----
+        gas_no2: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Nitrogen dioxide (NO₂) — OMI', gibs: 'OMI_Nitrogen_Dioxide_Tropo_Column', level: 6, period: 'day', lag: 6,
+                   legend: 'Aura OMI tropospheric NO₂ column, daily (~13 × 24 km). Yellow → red = more NO₂ from traffic, power plants and refineries (Riyadh, Jeddah, Eastern Province). Gaps = clouds or no overpass.' },
+        gas_so2: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Sulphur dioxide (SO₂) — OMI', gibs: 'OMI_SO2_Planetary_Boundary_Layer', level: 6, period: 'day', lag: 2,
+                   legend: 'Aura OMI SO₂ in the planetary boundary layer (Dobson units), daily. Hotspots mark refineries, power and desalination plants. Single days are noisy; compare several.' },
+        gas_o3: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Ozone (O₃) total column — OMI', gibs: 'OMI_Ozone_TOMS_Total_Column', level: 6, period: 'day', lag: 6,
+                   legend: 'Aura OMI total ozone column (Dobson units), daily. This is mostly stratospheric ozone, not ground-level smog — for surface ozone use the station values (CAMS).' },
+        gas_ch4: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Methane (CH₄) — AIRS, daily', gibs: 'AIRS_L3_Methane_400hPa_Volume_Mixing_Ratio_Daily_Day', level: 6, period: 'day', lag: 6,
+                   legend: 'Aqua AIRS methane mixing ratio at 400 hPa (mid-troposphere, ~7 km), daily, 1°. Shows regional patterns, not individual sources.' },
+        gas_ch4m: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Methane (CH₄) — AIRS, monthly', gibs: 'AIRS_L3_Methane_400hPa_Volume_Mixing_Ratio_Monthly_Day', level: 6, period: 'month', lag: 100,
+                   legend: 'Aqua AIRS monthly methane at 400 hPa — fewer gaps than the daily map.' },
+        gas_co2: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Carbon dioxide (CO₂) — OCO-2', gibs: 'OCO-2_Carbon_Dioxide_Total_Column_Average', level: 8, period: 'day', lag: 120,
+                   legend: 'OCO-2 column-average CO₂ (ppm) along narrow satellite tracks: data only where the satellite passed that day, and the newest data is usually several months old. Try several dates.' },
+        gas_co: { target: 'gas-layers', group: 'Satellite maps — NASA EOSDIS (GIBS)', label: 'Carbon monoxide (CO) — AIRS', gibs: 'AIRS_L3_Carbon_Monoxide_500hPa_Volume_Mixing_Ratio_Daily_Day', level: 6, period: 'day', lag: 6,
+                   legend: 'Aqua AIRS carbon monoxide at 500 hPa, daily, 1°. Shows smoke and pollution transport.' },
         owm_precip: { group: 'OpenWeatherMap (API key)', label: 'Precipitation now', owm: 'precipitation_new', legend: 'OpenWeatherMap current precipitation.' },
         owm_clouds: { group: 'OpenWeatherMap (API key)', label: 'Clouds now', owm: 'clouds_new', legend: 'OpenWeatherMap current cloud cover.' },
         owm_temp:   { group: 'OpenWeatherMap (API key)', label: 'Temperature now', owm: 'temp_new', legend: 'OpenWeatherMap current air temperature.' },
@@ -53,6 +68,11 @@
     // Date to request for a GIBS layer
     function layerDate(cfg) {
         let d = $('ext-date').value || DU.shiftDate(DU.isoDate(new Date()), -2);
+        // Each product is published with some delay ('lag' days): use its latest day instead of an empty map
+        if (cfg.lag) {
+            const latest = DU.shiftDate(DU.isoDate(new Date()), -cfg.lag);
+            if (d > latest) d = latest;
+        }
         if (cfg.period === 'month') d = d.slice(0, 8) + '01';
         if (cfg.max && d > cfg.max) d = cfg.max;
         return d;
@@ -86,9 +106,10 @@
     }
 
     function updateNote() {
-        const keys = Object.keys(active);
-        const box = $('ext-legend');
-        if (!keys.length) { box.innerHTML = ''; return; }
+        for (const [boxId, target] of [['ext-legend', 'ext-layers'], ['gas-legend', 'gas-layers']]) {
+        const keys = Object.keys(active).filter(k => (LAYERS[k].target || 'ext-layers') === target);
+        const box = $(boxId);
+        if (!keys.length) { box.innerHTML = ''; continue; }
         box.innerHTML = keys.map(k => {
             const cfg = LAYERS[k], st = active[k]._stats();
             const when = cfg.gibs ? ` <span class="small">(${layerDate(cfg)})</span>` : '';
@@ -96,6 +117,7 @@
                 ? `<div class="err small">No tiles for this date${cfg.max ? ` (latest is ${cfg.max})` : ''} — try an earlier date.</div>` : '';
             return `<div class="ext-legend-item"><strong>${cfg.label}</strong>${when}<div class="small">${cfg.legend}</div>${warn}</div>`;
         }).join('');
+        }
     }
 
     function toggle(key, on) {
@@ -104,7 +126,7 @@
             const layer = makeLayer(key);
             if (!layer) {
                 $('ext-legend').innerHTML = '<div class="err small">Enter your OpenWeatherMap API key first (free at openweathermap.org).</div>';
-                const cb = document.querySelector(`#ext-layers input[value="${key}"]`);
+                const cb = document.querySelector(`input[value="${key}"]`);
                 if (cb) cb.checked = false;
                 return;
             }
@@ -118,18 +140,28 @@
     }
 
     function init() {
-        const groups = {};
-        Object.entries(LAYERS).forEach(([k, cfg]) => { (groups[cfg.group] = groups[cfg.group] || []).push([k, cfg]); });
-        $('ext-layers').innerHTML = Object.entries(groups).map(([g, items]) => `
-            <div class="ext-group-title">${g}</div>
-            ${items.map(([k, cfg]) => `<label><input type="checkbox" value="${k}"> ${cfg.label}</label>`).join('')}
-        `).join('');
-        $('ext-layers').addEventListener('change', e => { if (e.target.value) toggle(e.target.value, e.target.checked); });
+        for (const target of ['ext-layers', 'gas-layers']) {
+            const groups = {};
+            Object.entries(LAYERS).filter(([, cfg]) => (cfg.target || 'ext-layers') === target)
+                .forEach(([k, cfg]) => { (groups[cfg.group] = groups[cfg.group] || []).push([k, cfg]); });
+            $(target).innerHTML = Object.entries(groups).map(([g, items]) => `
+                <div class="ext-group-title">${g}</div>
+                ${items.map(([k, cfg]) => `<label><input type="checkbox" value="${k}"> ${cfg.label}</label>`).join('')}
+            `).join('');
+            $(target).addEventListener('change', e => { if (e.target.value) toggle(e.target.value, e.target.checked); });
+        }
 
-        $('ext-date').value = DU.shiftDate(DU.isoDate(new Date()), -2);
-        $('ext-date').max = DU.isoDate(new Date());
-        $('ext-date').min = '2000-02-24';
-        $('ext-date').addEventListener('change', refreshDated);
+        // Two date pickers (Global Map Layers and Atmospheric Gases) share one date
+        const start = DU.shiftDate(DU.isoDate(new Date()), -2);
+        for (const id of ['ext-date', 'gas-date']) {
+            $(id).value = start;
+            $(id).max = DU.isoDate(new Date());
+            $(id).min = '2000-02-24';
+            $(id).addEventListener('change', e => {
+                $('ext-date').value = $('gas-date').value = e.target.value;
+                refreshDated();
+            });
+        }
 
         $('owm-key').value = owmKey();
         $('owm-save').addEventListener('click', () => {

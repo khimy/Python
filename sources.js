@@ -136,6 +136,7 @@
         ALLSKY_SFC_SW_DWN: ['shortwave_radiation_sum', 1],   // MJ/m²/day
         WS10M: ['wind_speed_10m_mean', 3.6],                // m/s → km/h
         WS10M_MAX: ['wind_speed_10m_max', 3.6],
+        WD10M: ['wind_direction_10m_dominant', 1],          // degrees (direction the wind comes from)
     };
 
     async function fetchPower(stations, start, end, onProgress) {
@@ -168,8 +169,8 @@
     // ---------- GFS & ECMWF forecasts (Open-Meteo) ----------
     const FORECAST_VARS = ['precipitation_sum', 'temperature_2m_mean', 'temperature_2m_max', 'temperature_2m_min',
         'relative_humidity_2m_mean', 'dew_point_2m_mean', 'et0_fao_evapotranspiration', 'shortwave_radiation_sum',
-        'sunshine_duration', 'wind_speed_10m_mean', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'pressure_msl_mean',
-        'soil_moisture_0_to_7cm_mean'];
+        'sunshine_duration', 'wind_speed_10m_mean', 'wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant',
+        'pressure_msl_mean', 'soil_moisture_0_to_7cm_mean'];
 
     function forecastSource(model) {
         return async (stations, start, end) => {
@@ -195,6 +196,46 @@
         };
     }
 
+    // ---------- Atmospheric composition: Copernicus CAMS (Open-Meteo Air Quality API) ----------
+    // Hourly values averaged to daily means (Saudi local time)
+    const CAMS_VARS = ['nitrogen_dioxide', 'sulphur_dioxide', 'formaldehyde', 'carbon_dioxide', 'methane',
+        'ozone', 'carbon_monoxide', 'dust', 'pm2_5', 'pm10'];
+
+    async function fetchCams(stations, start, end) {
+        const days = dateList(start, end);
+        const index = new Map(days.map((d, i) => [d, i]));
+        const out = [];
+        // Up to 12 stations per request keeps each response small
+        for (let c = 0; c < stations.length; c += 12) {
+            const part = stations.slice(c, c + 12);
+            const q = new URLSearchParams({
+                latitude: part.map(s => s.lat).join(','), longitude: part.map(s => s.lon).join(','),
+                hourly: CAMS_VARS.join(','), start_date: start, end_date: end, timezone: 'Asia/Riyadh'
+            });
+            const json = await cached(`cams|${part.map(s => s.id).join(',')}|${start}|${end}`,
+                () => getJson(`https://air-quality-api.open-meteo.com/v1/air-quality?${q}`));
+            const arr = Array.isArray(json) ? json : [json];
+            for (const r of arr) {
+                const daily = blankDaily(days.length);
+                let available = false;
+                for (const k of CAMS_VARS) {
+                    const sum = new Array(days.length).fill(0), n = new Array(days.length).fill(0);
+                    (r.hourly[k] || []).forEach((v, i) => {
+                        if (v === null) return;
+                        const di = index.get(r.hourly.time[i].slice(0, 10));
+                        if (di === undefined) return;
+                        sum[di] += v; n[di]++;
+                    });
+                    // A day needs at least 18 of 24 hours
+                    daily[k] = sum.map((v, i) => n[i] >= 18 ? v / n[i] : null);
+                    if (daily[k].some(v => v !== null)) available = true;
+                }
+                out.push({ time: days, daily, available });
+            }
+        }
+        return out;
+    }
+
     // ---------- Registry ----------
     const allKeys = Object.keys(VARS);
     const S = (o) => o;
@@ -202,14 +243,14 @@
         ncm: S({
             name: 'NCM observed', provider: 'National Center for Meteorology stations (WMO exchange, NOAA NCEI GSOD)',
             kind: 'observed', color: '#34e89e',
-            vars: allKeys.filter(k => VARS[k].src !== 'era5'),
+            vars: allKeys.filter(k => ['both', 'ncm'].includes(VARS[k].src)),
             range: () => ({ min: '1973-01-01', max: DU.shiftDate(today(), -1) }),
             fetch: (st, a, b) => window.fetchObserved(st, a, b)
         }),
         era5: S({
             name: 'ERA5 reanalysis', provider: 'ECMWF ERA5 via Open-Meteo Historical API (~25 km)',
             kind: 'model', color: '#f9a825',
-            vars: allKeys.filter(k => VARS[k].src !== 'ncm'),
+            vars: allKeys.filter(k => ['both', 'era5'].includes(VARS[k].src)),
             range: () => ({ min: DU.ARCHIVE_MIN, max: DU.archiveMaxDate() }),
             fetch: (st, a, b) => window.fetchArchive(st, a, b)
         }),
@@ -236,6 +277,12 @@
             kind: 'forecast', color: '#26c6da', vars: FORECAST_VARS,
             range: () => ({ min: DU.shiftDate(today(), -92), max: DU.shiftDate(today(), 15) }),
             fetch: forecastSource('gfs_seamless')
+        }),
+        cams: S({
+            name: 'CAMS air quality', provider: 'Copernicus Atmosphere Monitoring Service (CAMS) global analysis & forecast, ~40 km, via Open-Meteo Air Quality API. NO₂, SO₂, O₃, CO, dust and PM from Aug 2022; CO₂, CH₄ and HCHO only for recent periods.',
+            kind: 'model', color: '#8d6e63', vars: CAMS_VARS,
+            range: () => ({ min: '2022-08-01', max: DU.shiftDate(today(), 4) }),
+            fetch: fetchCams
         }),
         ecmwf: S({
             name: 'ECMWF forecast', provider: 'ECMWF IFS 0.25° forecast via Open-Meteo (up to 15 days ahead)',

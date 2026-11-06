@@ -65,6 +65,10 @@
                     <input type="checkbox" id="layer-solar" data-layer="solar">
                     Solar Radiation
                 </label>
+                <label>
+                    <input type="checkbox" id="layer-wind" data-layer="wind">
+                    Wind Speed &amp; Direction (arrows)
+                </label>
             </div>
         </div>
 
@@ -76,14 +80,80 @@
                 <label><input type="checkbox" data-layer="pm25"> PM2.5</label>
                 <label><input type="checkbox" data-layer="aod"> Aerosol Optical Depth</label>
                 <label><input type="checkbox" data-layer="uv"> UV Index</label>
-                <label><input type="checkbox" data-layer="ozone"> Ozone (O₃)</label>
-                <label><input type="checkbox" data-layer="no2"> Nitrogen Dioxide (NO₂)</label>
-                <label><input type="checkbox" data-layer="so2"> Sulphur Dioxide (SO₂)</label>
-                <label><input type="checkbox" data-layer="co"> Carbon Monoxide (CO)</label>
                 <label><input type="checkbox" data-layer="visibility"> Visibility</label>
                 <label><input type="checkbox" data-layer="vpd"> Vapour Pressure Deficit</label>
                 <label><input type="checkbox" data-layer="gusts"> Wind Gusts</label>
             </div>
+        </div>
+
+        <div class="section">
+            <h3>Atmospheric Gases</h3>
+            <div class="ext-group-title">At stations now — Copernicus CAMS</div>
+            <div class="layer-group">
+                <label><input type="checkbox" data-layer="no2"> Nitrogen Dioxide (NO₂)</label>
+                <label><input type="checkbox" data-layer="so2"> Sulphur Dioxide (SO₂)</label>
+                <label><input type="checkbox" data-layer="hcho"> Formaldehyde (HCHO)</label>
+                <label><input type="checkbox" data-layer="co2"> Carbon Dioxide (CO₂)</label>
+                <label><input type="checkbox" data-layer="ch4"> Methane (CH₄)</label>
+                <label><input type="checkbox" data-layer="ozone"> Ozone (O₃), ground level</label>
+                <label><input type="checkbox" data-layer="co"> Carbon Monoxide (CO)</label>
+            </div>
+            <label class="field">Satellite date <input type="date" id="gas-date"></label>
+            <div id="gas-layers" class="layer-group"></div>
+            <p class="small">No NASA map exists for formaldehyde: use Sentinel-5P in <b>Google Earth Engine</b> below (it also has NO₂, SO₂, CH₄, O₃ and CO at ~7 km).
+               Daily and period values for all gases: "CAMS air quality" in each station's time series and in the Areal Analysis.</p>
+            <div id="gas-legend"></div>
+        </div>
+
+        <div class="section">
+            <h3>Google Earth Engine</h3>
+            <label class="field">Dataset <select id="gee-dataset"></select></label>
+            <p class="small">Sentinel-5P arrives within days; ERA5-Land, TerraClimate, GRACE and MODIS ET are added to Earth Engine weeks to months later —
+               if a map or table is empty, choose an earlier period.</p>
+            <div class="form-grid">
+                <label>From <input type="date" id="gee-from"></label>
+                <label>Until <input type="date" id="gee-until"></label>
+            </div>
+            <button id="gee-script-btn" class="btn btn-small">📝 Code Editor script (no setup)</button>
+            <div id="gee-script-box" class="hidden">
+                <textarea id="gee-script" class="script-box" rows="8" readonly></textarea>
+                <div class="btn-row">
+                    <button id="gee-copy" class="btn btn-small">Copy</button>
+                    <a class="btn btn-small btn-link" href="https://code.earthengine.google.com/" target="_blank" rel="noopener">Open Code Editor ↗</a>
+                </div>
+            </div>
+
+            <details class="options">
+                <summary>Run inside this site (sign in)</summary>
+                <label class="field">OAuth client ID <input type="text" id="gee-client" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off"></label>
+                <label class="field">Earth Engine Cloud project ID <input type="text" id="gee-project" placeholder="my-ee-project" autocomplete="off"></label>
+                <button id="gee-signin" class="btn btn-small">🔑 Sign in with Google</button>
+                <div id="gee-tools" class="hidden">
+                    <div class="btn-row">
+                        <button id="gee-map" class="btn btn-small">🗺 Show on map</button>
+                        <button id="gee-values" class="btn btn-small">📍 Station values</button>
+                    </div>
+                    <div class="btn-row">
+                        <select id="gee-station"></select>
+                        <button id="gee-series" class="btn btn-small">📈 Daily series</button>
+                        <button id="gee-clear" class="btn btn-small btn-secondary">Clear</button>
+                    </div>
+                </div>
+                <details class="method">
+                    <summary>How to set up</summary>
+                    <ol class="small setup">
+                        <li>Register a Google Cloud project for Earth Engine (free for non-commercial use):
+                            <a href="https://code.earthengine.google.com/register" target="_blank" rel="noopener">code.earthengine.google.com/register</a>.</li>
+                        <li>In the Google Cloud Console for that project, enable the <b>Earth Engine API</b>.</li>
+                        <li>APIs &amp; Services → Credentials → <b>Create OAuth client ID</b> → Web application. Add
+                            <code id="gee-origin"></code> (this site's address) under <b>Authorised JavaScript origins</b>.</li>
+                        <li>Paste the client ID and project ID above and press Sign in. They are saved only in this browser.</li>
+                    </ol>
+                </details>
+            </details>
+            <div id="gee-status" class="status"></div>
+            <div id="gee-legend"></div>
+            <div id="gee-results"></div>
         </div>
 
         <div class="section">
@@ -332,6 +402,7 @@
                     <button class="btn btn-small btn-secondary" data-outlook="seasonal">🌦 ECMWF seasonal outlook (6 months)</button>
                     <button class="btn btn-small btn-secondary" data-outlook="cmip6">🌡 CMIP6 climate projection (to 2050)</button>
                     <button class="btn btn-small btn-secondary" data-outlook="solar">☀️ Global Solar Atlas</button>
+                    <button id="ts-windrose" class="btn btn-small btn-secondary">🧭 Wind rose (loaded period)</button>
                 </div>
                 <div id="ts-outlook"></div>
 
@@ -368,6 +439,8 @@
     <script src="sources.js"></script>
     <script src="analysis.js"></script>
     <script src="layers.js"></script>
+    <script src="wind.js"></script>
+    <script src="gee.js"></script>
     <script src="catalog.js"></script>
 </body>
 </html>

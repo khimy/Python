@@ -492,6 +492,30 @@ details.method p { margin-top: 6px; }
 #ext-legend .err, .ext-legend-item .err { color: #ff6b6b; }
 
 .table-scroll { overflow-x: auto; }
+
+/* Wind arrows */
+.wind-arrow { background: none; border: none; }
+.wind-arrow svg { display: block; filter: drop-shadow(0 0 1px rgba(0,0,0,0.6)); }
+svg.windrose { width: 100%; max-width: 560px; display: block; margin: 0 auto; }
+
+/* Google Earth Engine */
+.script-box {
+    width: 100%;
+    margin-top: 6px;
+    background: #0f0f22;
+    color: #cfe;
+    border: 1px solid #2a2a4a;
+    border-radius: 6px;
+    font: 11px/1.4 Consolas, 'Courier New', monospace;
+    padding: 6px;
+    resize: vertical;
+}
+.btn-link { display: inline-block; text-align: center; text-decoration: none; }
+#gee-station { flex: 1 1 100px; width: auto; }
+.setup { padding-left: 18px; }
+.setup li { margin: 4px 0; }
+.setup code, #gee-legend code { background: #0f0f22; padding: 0 4px; border-radius: 3px; }
+.small-chart { height: 180px; }
 .modal-box.wide { width: 1000px; }
 .catalog td { vertical-align: top; }
 .catalog a { color: #34e89e; font-weight: 600; }
