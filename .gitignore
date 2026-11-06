@@ -3,3 +3,4 @@ package-lock.json
 package.json
 screenshot.png
 *.log
+__pycache__/
